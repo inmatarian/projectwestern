@@ -39,7 +39,7 @@ function Snitch:toggle()
   Snitch.dt = 0.99
 end
 
-function Snitch:update (dt)
+function Snitch:draw(dt)
   if not self.visible then return end
   dt = dt + Snitch.dt
   if dt >= 1 then
@@ -49,6 +49,7 @@ function Snitch:update (dt)
     self:writeln("FPS:", fps, "Mem:", math.floor(garbage).."k")
   end
   Snitch.dt = dt
+  Snitch:super().draw(self, dt)
 end
 
 --------------------------------------------------------------------------------
@@ -85,16 +86,80 @@ end
 
 --------------------------------------------------------------------------------
 
-BattleState = State:clone {
+BattleSprite = Sprite:clone {
+  selectedTile = 0,
+  baseTile = 0,
+  selected = false
+}
 
+function BattleSprite:draw(x, y, dt)
+  self.dt = (self.dt or 0) + dt
+  if self.selected and math.floor(self.dt*3) % 2 == 1 then
+    self.tile = self.selectedTile
+  else
+    self.tile = self.baseTile
+  end
+  BattleSprite:super().draw(self, x, y, dt)
+end
+
+BattlePlayer = BattleSprite:clone {
+  baseTile = 129
+}
+
+function BattlePlayer:runLogic( key )
+  if key == "up" then
+    self:move( 0, -1 )
+  elseif key == "down" then
+    self:move( 0, 1 )
+  elseif key == "left" then
+    self:move( -1, 0 )
+  elseif key == "right" then
+    self:move( 1, 0 )
+  end
+end
+
+BattleEnemy = BattleSprite:clone {
+  baseTile = 130
+}
+
+function BattleEnemy:runLogic()
+  local dir = math.random(1, 4)
+  if dir == 1 then
+    self:move( 0, -1 )
+  elseif dir == 2 then
+    self:move( 0, 1 )
+  elseif dir == 3 then
+    self:move( -1, 0 )
+  elseif dir == 4 then
+    self:move( 1, 0 )
+  end
+end
+
+BattleState = State:clone {
 
 }
 
 function BattleState:enter()
   self.screen = TextWindow( 0, 0, 30, floor(Graphics.gameHeight/8) )
   self.screen:frame("double", Color.GRAY)
+
+  self.spriteWorld = SpriteWorld()
   self.world = TileLayer.loadMap("level/testbattle.lua", 8, 8, 224, 224)
-  self.world:selfCenter()
+  self.world:selfCenter():setSpriteWorld(self.spriteWorld)
+  self.spriteWorld:setTileLayer( self.world )
+
+  self.sprites = {
+    BattlePlayer( 4, 5 ),
+    BattleEnemy( 8, 5 )
+  }
+
+  for _, spr in ipairs(self.sprites) do
+    self.spriteWorld:addSprite(spr)
+  end
+
+  self.turn = 1
+  self.sprites[1].selected = true
+
   self.stats = BattleStatsWindow( 30, 0, 10, 30 )
   self:addLayer(self.screen, self.world, self.stats, Snitch())
 end
@@ -102,6 +167,12 @@ end
 function BattleState:keypressed(key)
   if key == "escape" then
     StateMachine:pop()
+  else
+    self.sprites[self.turn]:runLogic(key)
+    self.sprites[self.turn].selected = false
+    self.turn = self.turn + 1
+    if self.turn > #self.sprites then self.turn = 1 end
+    self.sprites[self.turn].selected = true
   end
 end
 
@@ -157,7 +228,9 @@ end
 
 --------------------------------------------------------------------------------
 
-Game = {}
+Game = {
+  deltaTime = 0
+}
 
 Game.Hugo = PlayerStats:clone {
   hitPoints = 0,
@@ -178,12 +251,17 @@ function love.load()
 end
 
 function love.update(dt)
-  StateMachine:send( E.update, dt )
+  Graphics.deltaTime = dt
+  Game.deltaTime = Game.deltaTime + dt
+  if Game.deltaTime > 0.1 then
+    StateMachine:send( E.update, 0.1 )
+    Game.deltaTime = Game.deltaTime - 0.1
+  end
 end
 
 function love.draw()
   Graphics:start()
-  StateMachine:send( E.draw, dt )
+  StateMachine:send( E.draw, Graphics.deltaTime )
   Graphics:stop()
 end
 

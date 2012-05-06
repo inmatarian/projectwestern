@@ -4,33 +4,23 @@ World = Object:clone {
 }
 
 function World:init( filename )
+  self.spriteWorld = SpriteWorld()
   self.tileLayer = TileLayer.loadMap( filename, 8, 8, (320-16), (240-16) )
-  self.tileLayer:setSpriteWorld( self )
+  self.tileLayer:setSpriteWorld( self.spriteWorld )
+  self.spriteWorld:setTileLayer( self.tileLayer )
 
-  self.sprites = {}
-  self.spatialHash = {}
-  self.logicQueue = {}
-
-  self.player = Player( 64, 64, 129 )
+  self.player = Player( 64, 64 )
   print("Player is", self.player)
 
-  self:addSprite( self.player )
-  self:addSprite( Enemy( 60, 60, 130 ) )
+  self.spriteWorld:addSprite( self.player )
+  self.spriteWorld:addSprite( Enemy( 60, 60 ) )
   self.tileLayer:followSprite( self.player.x, self.player.y )
 
   return self
 end
 
 function World:runAllLogic( keypress )
-  local Q = self.logicQueue
-  for _, spr in ipairs(self.sprites) do table.insert(Q, spr) end
-  table.sort(Q, Sprite.sortingFunction)
-  local N = #Q
-  for i = 1, N do
-    Q[i]:runLogic( keypress )
-  end
-  for i = 1, N do Q[i] = nil end
-
+  self.spriteWorld:runAllLogic( keypress )
   self.tileLayer:followSprite( self.player.x, self.player.y )
 end
 
@@ -40,44 +30,15 @@ function World:movePlayer( dx, dy )
 end
 
 function World:getSpriteAt( x, y )
-  return self.spatialHash[ y * 1000 + x ]
-end
-
-function World:moveSprite( spr, dx, dy )
-  self.spatialHash[ spr.y * 1000 + spr.x ] = nil
-  spr.x = floor(spr.x + dx)
-  spr.y = floor(spr.y + dy)
-  self.spatialHash[ spr.y * 1000 + spr.x ] = spr
-  return self
-end
-
-function World:addSprite( spr )
-  for _, v in ipairs(self.sprites) do
-    if v == spr then return self end
-  end
-  table.insert( self.sprites, spr )
-  self.spatialHash[ spr.y * 1000 + spr.x ] = spr
-  spr:setParent( self )
-  return self
-end
-
-function World:removeSprite( spr )
-  self.spatialHash[ spr.y * 1000 + spr.x ] = nil
-  for i, v in ipairs(self.sprites) do
-    if v == spr then
-      table.remove( self.sprites, i )
-      break
-    end
-  end
-  return self
+  return self.spriteWorld:getSpriteAt(x, y)
 end
 
 function World:getTileAt( x, y )
   return self.tileLayer:getTile(x, y)
 end
 
-function World:draw()
-  self.tileLayer:draw()
+function World:draw(dt)
+  self.tileLayer:draw(dt)
 end
 
 function World:update(dt)
@@ -87,6 +48,7 @@ end
 --------------------------------------------------------------------------------
 
 Player = Sprite:clone {
+  tile = 129,
   priority = 2993,
 }
 
@@ -102,7 +64,9 @@ function Player:runLogic( key )
   end
 end
 
-Enemy = Sprite:clone {}
+Enemy = Sprite:clone {
+  tile = 130
+}
 
 function Enemy:runLogic()
   local dir = math.random(1, 5)

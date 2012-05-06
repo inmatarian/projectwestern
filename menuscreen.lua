@@ -12,14 +12,9 @@ function MenuScreenState:enter()
   self:addLayer(self.playerStats, self.moneyWin, self.mainMenu, test)
 end
 
-function MenuScreenState:draw()
-  StateMachine:downsend( self, -1, "draw" )
-  MenuScreenState:super().draw(self)
-end
-
-function MenuScreenState:update(dt)
-  StateMachine:downsend( self, -1, "update", dt )
-  MenuScreenState:super().update(self)
+function MenuScreenState:draw(dt)
+  StateMachine:downsend( self, -1, "draw", dt )
+  MenuScreenState:super().draw(self, dt)
 end
 
 function MenuScreenState:keypressed(key)

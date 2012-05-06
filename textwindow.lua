@@ -158,7 +158,7 @@ end
 
 TextWindow.update = NULLFUNC
 
-function TextWindow:draw()
+function TextWindow:draw(dt)
   if not self.visible then return end
   local x, y = self.x, self.y
   local w, h = self.width, self.height

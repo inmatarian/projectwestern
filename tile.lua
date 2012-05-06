@@ -5,9 +5,14 @@ Tile = Object:clone {
 }
 
 function Tile:init( id, opaque, solid )
+  self.id = id
   self.lookup[id] = self
   self.opaque = opaque or 0
   self.solid = solid or false
+end
+
+function Tile:draw( x, y, dt )
+  Graphics:drawTile( x, y, self.id )
 end
 
 function Tile:getTile( id )

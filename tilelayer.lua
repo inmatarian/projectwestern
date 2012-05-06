@@ -44,6 +44,7 @@ function TileLayer:selfCenter()
   self.offsetX, self.offsetY = 0, 0
   self.fixedOffsetX, self.fixedOffsetY = floor(16*ox), floor(16*oy)
   self.centerX, self.centerY = cx, cy
+  return self
 end
 
 function TileLayer:followSprite(x, y)
@@ -106,7 +107,9 @@ function TileLayer:screenPositionTile( x, y )
   return self.x + (x*16-l) + ox, self.y + (y*16-u) + oy
 end
 
-function TileLayer:draw()
+function TileLayer:draw(dt)
+  self:animateScroll(dt)
+
   Graphics:setClipping( self.x, self.y, self.viewWidth, self.viewHeight )
   Graphics:setColor( 255, 255, 255 )
 
@@ -115,10 +118,12 @@ function TileLayer:draw()
     for x = left, right do
       local visi = tonumber(self:getVisi(x, y))
       if visi and (visi > 0) then
-        local sprite = self:getSpriteAt(x, y)
-        local tile = (sprite and sprite.tile) or self:get(x, y)
+        local drawable = self:getSpriteAt(x, y)
+        if not drawable then
+          drawable = self:getTile(x, y)
+        end
         local xx, yy = self:screenPositionTile( x, y )
-        Graphics:drawTile( xx, yy, tile )
+        drawable:draw(xx, yy, dt)
       end
     end
   end
@@ -207,7 +212,7 @@ function TileLayer:hasLineOfSight( sx, sy, tx, ty )
   return true
 end
 
-function TileLayer:update(dt)
+function TileLayer:animateScroll(dt)
   local ox, oy = self.offsetX, self.offsetY
   local sx, sy = sign(ox), sign(oy)
   local xspeed, yspeed = ox*6*dt, oy*6*dt
@@ -216,4 +221,6 @@ function TileLayer:update(dt)
   if (sy > 0 and oy < 0.25) or (sy < 0 and oy > -0.25) then oy = 0 end
   self.offsetX, self.offsetY = ox, oy
 end
+
+function TileLayer:update(dt) end
 

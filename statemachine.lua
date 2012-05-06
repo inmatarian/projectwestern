@@ -47,7 +47,7 @@ function State:init()
   return self
 end
 
-function State:draw()
+function State:draw(dt)
   for _, v in pairs(self.layers) do
     v:draw(dt)
   end
