@@ -1,31 +1,54 @@
 
-Input = {}
+Input = {
+  tap = {},
+  hold = {},
+  translator = {
+    [" "] = "space",
+    lctrl = "ctrl",
+    rctrl = "ctrl",
+    lalt = "alt",
+    ralt = "alt",
+    lshift = "shift",
+    rshift = "shift",
+    ["return"] = "enter",
+  }
+}
+
+local mt = {}
+
+function mt.__index(self, key)
+  if self.tap[key] then
+    return "tap"
+  elseif self.hold[key] then
+    return "hold"
+  end
+  return nil
+end
 
 function Input:init()
   print("Input:init()")
   love.keyboard.setKeyRepeat( 0.500, 0.125 )
+  return setmetatable(self, mt)
 end
 
-function Input:translate(k, u)
-  local key
+function Input:keypressed(key)
+  key = self.translator[key] or key
+  self.tap[key] = true
+  self.hold[key] = true
+  print( "Input:keypressed", key )
+  return key
+end
 
-  if type(u) == "number" and u > 32 and u < 127 then
-    key = string.char(u)
-  elseif k~="rshift" and k~="lshift" and k~="ralt" and k~="lalt" then
-
-    if k == " " then
-      key = "space"
-    elseif k == "return" then
-      key = "enter"
-    else
-      key = k
-    end
+function Input:update(dt)
+  for k, _ in self.hold do
+    self.tap[k] = nil
   end
+end
 
-  if key and love.keyboard.isDown("lalt", "ralt") then
-    key = "alt_" .. key
-  end
-
+function Input:keyreleased(key)
+  key = self.translator[key] or key
+  self.tap[key] = nil
+  self.hold[key] = nil
   return key
 end
 

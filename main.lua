@@ -106,15 +106,19 @@ BattlePlayer = BattleSprite:clone {
   baseTile = 129
 }
 
-function BattlePlayer:runLogic( key )
-  if key == "up" then
+function BattlePlayer:runLogic()
+  if Input.tap.up then
     self:move( 0, -1 )
-  elseif key == "down" then
+    return true
+  elseif Input.tap.down then
     self:move( 0, 1 )
-  elseif key == "left" then
+    return true
+  elseif Input.tap.left then
     self:move( -1, 0 )
-  elseif key == "right" then
+    return true
+  elseif Input.tap.right then
     self:move( 1, 0 )
+    return true
   end
 end
 
@@ -133,6 +137,7 @@ function BattleEnemy:runLogic()
   elseif dir == 4 then
     self:move( 1, 0 )
   end
+  return true
 end
 
 BattleState = State:clone {
@@ -167,13 +172,31 @@ end
 function BattleState:keypressed(key)
   if key == "escape" then
     StateMachine:pop()
-  else
-    self.sprites[self.turn]:runLogic(key)
-    self.sprites[self.turn].selected = false
-    self.turn = self.turn + 1
-    if self.turn > #self.sprites then self.turn = 1 end
-    self.sprites[self.turn].selected = true
   end
+end
+
+function BattleState:update(dt)
+  local who = self.sprites[self.turn]
+  if who:isA(BattlePlayer) then
+    local done = who:runLogic()
+    if done then self:advanceTurn() end
+  else
+    self.turnTimer = (self.turnTimer or 0) + dt
+    if self.turnTimer > 1 then
+      local done = who:runLogic()
+      if done then
+        self.turnTimer = 0
+        self:advanceTurn()
+      end
+    end
+  end
+end
+
+function BattleState:advanceTurn()
+  self.sprites[self.turn].selected = false
+  self.turn = self.turn + 1
+  if self.turn > #self.sprites then self.turn = 1 end
+  self.sprites[self.turn].selected = true
 end
 
 BattleStatsWindow = TextWindow:clone {}
@@ -241,7 +264,6 @@ Game.Hugo = PlayerStats:clone {
   agility = 10,
 }
 
-
 --------------------------------------------------------------------------------
 
 function love.load()
@@ -266,7 +288,7 @@ function love.draw()
 end
 
 function love.keypressed(k, u)
-  local key = Input:translate(k, u)
+  key = Input:keypressed(k, u)
 
   if key == 'f2' then
     Graphics:saveScreenshot()
@@ -283,6 +305,10 @@ function love.keypressed(k, u)
   elseif k then
     StateMachine:send( E.keypressed, key )
   end
+end
+
+function love.keyreleased(k)
+  Input:keyreleased(k)
 end
 
 function love.focus(f)
