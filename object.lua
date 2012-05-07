@@ -6,41 +6,28 @@ function MT.__call(parent, ...)
 end
 
 function MT.__index(obj, key)
-  local val = rawget(obj, "__parent")[key]
-  if type(val)=="nil" then
-    local handler = obj.__unknown
-    if type(handler)=="function" then
-      val = handler(obj, key)
-    end
-  end
-  return val
+  local parent = rawget(obj, "__parent")
+  if parent then return parent[key] end
 end
 
 Object = {}
-Object.__parent = MT
 setmetatable( Object, MT )
 
 function Object:init() return self end
 
 function Object:new(...)
-  local instance = setmetatable({}, self)
+  local instance = self:clone()
   return instance:init(...) or instance
 end
 
 function Object:clone(body)
   body = body or {}
-  body.__index = body
   body.__parent = self
   return setmetatable(body, MT)
 end
 
 function Object:super()
-  local mt = getmetatable(self)
-  if mt == MT then
-    return rawget(self, "__parent")
-  else
-    return mt
-  end
+  return rawget(self, "__parent")
 end
 
 function Object:superinit(obj, ...)
@@ -51,7 +38,7 @@ function Object:isA(ancestor)
   repeat
     if self == ancestor then return true end
     self = self:super()
-  until self == Object
+  until not self
   return self == ancestor
 end
 
@@ -69,6 +56,7 @@ do
   local Test = Object:clone()
   Test.blah = 27
   function Test:lol() return self.blah end
+  function Test:__add(t2) print( self, "+", t2 ); return 0 end
   local Test2 = Test:clone()
   Test2.blah = 42
   local test = Test2()

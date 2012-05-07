@@ -35,12 +35,11 @@ function Input:keypressed(key)
   key = self.translator[key] or key
   self.tap[key] = true
   self.hold[key] = true
-  print( "Input:keypressed", key )
   return key
 end
 
 function Input:update(dt)
-  for k, _ in self.hold do
+  for k, _ in pairs(self.hold) do
     self.tap[k] = nil
   end
 end

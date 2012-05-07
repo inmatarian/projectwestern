@@ -17,14 +17,14 @@ function MenuScreenState:draw(dt)
   MenuScreenState:super().draw(self, dt)
 end
 
-function MenuScreenState:keypressed(key)
-  if key == "escape" then
+function MenuScreenState:update(dt)
+  if Input.tap.escape then
     self:popMenu()
     if #self.menuStack <= 0 then
       StateMachine:pop()
     end
   else
-    self.menuStack[#self.menuStack]:keypressed(key)
+    self.menuStack[#self.menuStack]:update(dt)
   end
 end
 
@@ -104,15 +104,15 @@ SelectionMixin = {
     self.selectionMax = max
     return self
   end,
-  handleSelectionKeypressed = function(self, key)
+  handleSelectionUpdate = function(self, dt)
     local dist = 0
-    if key == "up" or key == "left" then dist = -1
-    elseif key == "down" or key == "right" then dist = 1
-    elseif key == "pageup" then dist = -8
-    elseif key == "pagedown" then dist = 8
-    elseif key == "home" then dist = -9001
-    elseif key == "end" then dist = 9001
-    elseif key == "enter" then
+    if Input.tap.up or Input.tap.left then dist = -1
+    elseif Input.tap.down or Input.tap.right then dist = 1
+    elseif Input.tap.pageup then dist = -8
+    elseif Input.tap.pagedown then dist = 8
+    elseif Input.tap.home then dist = -9001
+    elseif Input.tap["end"] then dist = 9001
+    elseif Input.tap.enter then
       self:selected( self.selectionOption )
     end
     if dist ~= 0 then
@@ -238,8 +238,8 @@ function MenuScreenMenuList:refresh()
   return self
 end
 
-function MenuScreenMenuList:keypressed(key)
-  self:handleSelectionKeypressed(key)
+function MenuScreenMenuList:update(dt)
+  self:handleSelectionUpdate(dt)
 end
 
 function MenuScreenMenuList:selected( index )
@@ -277,8 +277,8 @@ function MenuScreenDialog:init( x, y, parent, callback )
   return self
 end
 
-function MenuScreenDialog:keypressed( key )
-  if key=="enter" or key=="escape" then
+function MenuScreenDialog:update(dt)
+  if Input.tap.enter or Input.tap.escape then
     self:doCallback()
   end
 end
@@ -358,8 +358,8 @@ function CharacterLearnWindow:refresh()
   return self
 end
 
-function CharacterLearnWindow:keypressed(key)
-  self:handleSelectionKeypressed(key)
+function CharacterLearnWindow:update(dt)
+  self:handleSelectionUpdate(dt)
 end
 
 function CharacterLearnWindow:selected( index )

@@ -1,5 +1,5 @@
 
-StateMachine = { stack = {} }
+StateMachine = { stack = {}, queue = {} }
 
 function StateMachine:sendTo( index, message, ... )
   local state = self.stack[index]
@@ -7,6 +7,9 @@ function StateMachine:sendTo( index, message, ... )
 end
 
 function StateMachine:send( message, ... )
+  if (message == "update") and (#self.queue >= 1) then
+    self:push( table.remove( self.queue, 1 ) )
+  end
   self:sendTo( #self.stack, message, ... )
 end
 
@@ -28,8 +31,12 @@ function StateMachine:pop()
   self:send(E.resume)
 end
 
+function StateMachine:enqueue( state )
+  table.insert(self.queue, state)
+end
+
 function StateMachine:isEmpty()
-  return ( #self.stack == 0 )
+  return ( #self.stack == 0 ) and ( #self.queue == 0 )
 end
 
 --------------------------------------------------------------------------------
@@ -40,6 +47,7 @@ State = Object:clone {
   suspend = NULLFUNC,
   resume = NULLFUNC,
   focus = NULLFUNC,
+  keypressed = NULLFUNC,
 }
 
 function State:init()

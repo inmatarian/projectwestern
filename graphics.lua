@@ -7,8 +7,8 @@ Graphics = {
 }
 
 function Graphics:init()
-  self.xScale = math.max(1, floor(love.graphics.getWidth() / self.gameWidth))
-  self.yScale = math.max(1, floor(love.graphics.getHeight() / self.gameHeight))
+  self.xScale = math.max(1,floor(love.graphics.getWidth()/self.gameWidth))
+  self.yScale = math.max(1,floor(love.graphics.getHeight()/self.gameHeight))
   love.graphics.setColorMode("modulate")
   love.graphics.setBlendMode("alpha")
   self:loadTileset("tileset.png")
@@ -17,19 +17,21 @@ function Graphics:init()
 end
 
 function Graphics:setNextScale()
-  self:changeScale( (self.xScale % 4) + 1 )
+  self:changeScale((self.xScale%4)+1)
+  return self
 end
 
 function Graphics:changeScale(size)
   self.xScale, self.yScale = size, size
   love.graphics.setMode( self.gameWidth*size, self.gameHeight*size, false )
+  return self
 end
 
 function Graphics:saveScreenshot()
+  local name = string.format("screenshot-%s.png", os.date("%Y%m%d-%H%M%S"))
   local shot = love.graphics.newScreenshot()
-  local filedata = love.image.newEncodedImageData(shot, "bmp")
-  local name = string.format("screenshot-%s.bmp", os.date("%Y%m%d-%H%M%S"))
-  love.filesystem.write(name, filedata)
+  shot:encode(name, "png")
+  return self
 end
 
 function Graphics.loadImageQuads(name, width, height, firstid)
@@ -69,6 +71,7 @@ function Graphics:drawTile(x, y, t, c)
   x, y = floor(x*xs)/xs, floor(y*ys)/ys
   if c then love.graphics.setColor(c) end
   love.graphics.drawq( self.tileset, quad, x, y )
+  return self
 end
 
 function Graphics:drawChar(x, y, t, c, b)
@@ -77,23 +80,28 @@ function Graphics:drawChar(x, y, t, c, b)
   local xs, ys = self.xScale, self.yScale
   x, y = floor(x*8*xs)/xs, floor(y*8*ys)/ys
   love.graphics.setColor(b)
-  love.graphics.rectangle( "fill", x, y, 8, 8 )
+  love.graphics.drawq( self.font, self.fontquads[219], x, y )
+  -- love.graphics.rectangle( "fill", x, y, 8, 8 )
   love.graphics.setColor(c)
   love.graphics.drawq( self.font, quad, x, y )
+  return self
 end
 
 function Graphics:setColor(c, ...)
   love.graphics.setColor( c, ... )
+  return self
 end
 
 function Graphics:start()
   love.graphics.scale( Graphics.xScale, Graphics.yScale )
   love.graphics.setLine( Graphics.xScale, "smooth" )
   love.graphics.setColor( 255, 255, 255 )
+  return self
 end
 
 function Graphics:stop()
   love.graphics.setScissor()
+  return self
 end
 
 --------------------------------------------------------------------------------
