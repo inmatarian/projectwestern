@@ -22,7 +22,12 @@ function BattleState:enter()
   self.turn = 1
   self.sprites[1].selected = true
 
-  self.stats = BattleStatsWindow( 30, 0, 10, 30 )
+  self.roster = {}
+  for _, ps in ipairs(Game.players) do
+    self.roster[#self.roster+1] = ps:clone()
+  end
+
+  self.stats = BattleStatsWindow( self.roster, 30, 0, 10, 30 )
   self:addLayer(self.screen, self.world, self.stats, Snitch())
 end
 
@@ -47,8 +52,9 @@ end
 
 BattleStatsWindow = TextWindow:clone {}
 
-function BattleStatsWindow:init(...)
+function BattleStatsWindow:init(roster, ...)
   BattleStatsWindow:superinit(self, ...)
+  self.roster = roster
   return self:refresh()
 end
 
@@ -56,12 +62,16 @@ function BattleStatsWindow:refresh()
   self:reset()
       :fill(ASCII.Space)
       :frame('single')
-      :drawCharacter(1, "HUGO", Game.Hugo )
+      :horizLine('single', 0, 9, self.width)
+
+  for i, ps in ipairs(Game.players) do
+    self:drawCharacter( 1 + ((i-1)*2), ps )
+  end
   return self
 end
 
-function BattleStatsWindow:drawCharacter( y, name, ps )
-  self:printf(1, y, name)
+function BattleStatsWindow:drawCharacter( y, ps )
+  self:printf(1, y, ps.name)
       :setColor(Color.CYAN)
       :set(6, y, ASCII.Delete)
       :printf(7, y, "%2i", ps.magicPoints )

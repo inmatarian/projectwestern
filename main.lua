@@ -54,7 +54,27 @@ end
 
 --------------------------------------------------------------------------------
 
-PlayerStats = Object:clone ()
+PlayerStats = Object:clone {
+  statNames = {
+    "name",
+    "hitPoints",
+    "magicPoints",
+    "strength",
+    "intelligence",
+    "vitality",
+    "agility",
+    "techLevel",
+    "techPoints",
+    "experience"
+  }
+}
+
+function PlayerStats:init( datum )
+  for _, k in ipairs(self.statNames) do
+    self[k] = datum[k] or 0
+  end
+  self.knowledge = {}
+end
 
 function PlayerStats:maxHP()
   return math.max(15, math.min(999, 6*(self.vitality+1) + 4*(self.strength+1)))
@@ -79,64 +99,86 @@ end
 --------------------------------------------------------------------------------
 
 Game = {
-  deltaTime = 0
+  deltaTime = 0,
+  focused = true,
+  HugoDatum = {
+    name = "Hugo",
+    hitPoints = 0,
+    magicPoints = 0,
+    strength = 10,
+    intelligence = 10,
+    vitality = 10,
+    agility = 10,
+    techLevel = 1,
+    techPoints = 1,
+    experience = 0
+  }
 }
 
-Game.Hugo = PlayerStats:clone {
-  hitPoints = 0,
-  magicPoints = 0,
-  strength = 10,
-  intelligence = 10,
-  vitality = 10,
-  agility = 10,
-}
-
---------------------------------------------------------------------------------
-
-function love.load()
+function Game.init()
   Graphics:init()
   Input:init()
+
+  Game.players = {
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum )
+  }
+
   StateMachine:push( ExplorerState() )
 end
 
-function love.update(dt)
-  Graphics.deltaTime = dt
-  Game.deltaTime = dt
-  StateMachine:send( E.update, dt )
+function Game.update(dt)
+  if Game.focused then
+    Game.deltaTime = dt
+    Graphics.deltaTime = dt
+
+    if Input.tap.f2 then
+      Graphics:saveScreenshot()
+    elseif Input.tap.f3 then
+      Snitch:toggle()
+    elseif Input.tap.f5 then
+      Graphics:setNextScale()
+    elseif Input.tap.f9 then
+      error("Debug crash!")
+    elseif Input.tap.f10 then
+      love.event.quit()
+    end
+
+    StateMachine:send( E.update, dt )
+  else
+    Game.deltaTime = 0
+    Graphics.deltaTime = 0
+  end
+
   Input:update(dt)
 end
 
-function love.draw()
+function Game.draw()
   Graphics:start()
   StateMachine:send( E.draw, Graphics.deltaTime )
   Graphics:stop()
 end
 
-function love.keypressed(k, u)
-  key = Input:keypressed(k, u)
-
-  if key == 'f2' then
-    Graphics:saveScreenshot()
-  elseif key == 'f3' then
-    Snitch:toggle()
-  elseif key == 'f5' then
-    Graphics:setNextScale()
-  elseif key == 'f8' then
-    collectgarbage()
-  elseif key == 'f10' then
-    love.event.quit()
-  elseif key == 'f9' then
-    error("Debug crash!")
-  elseif k then
-    StateMachine:send( E.keypressed, key )
-  end
+function Game.keypressed(k, u)
+  Input:keypressed(k, u)
 end
 
-function love.keyreleased(k)
+function Game.keyreleased(k)
   Input:keyreleased(k)
 end
 
-function love.focus(f)
-  StateMachine:send( E.focus, f )
+function Game.focus(f)
+  Game.focused = f
 end
+
+--------------------------------------------------------------------------------
+
+love.load = Game.init
+love.update = Game.update
+love.draw = Game.draw
+love.keypressed = Game.keypressed
+love.keyreleased = Game.keyreleased
+love.focus = Game.focus
 

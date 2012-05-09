@@ -69,7 +69,7 @@ function Graphics:drawTile(x, y, t, c)
   if not quad then return end
   local xs, ys = self.xScale, self.yScale
   x, y = floor(x*xs)/xs, floor(y*ys)/ys
-  if c then love.graphics.setColor(c) end
+  if c then self:setColor(c) end
   love.graphics.drawq( self.tileset, quad, x, y )
   return self
 end
@@ -79,23 +79,32 @@ function Graphics:drawChar(x, y, t, c, b)
   if not quad then return end
   local xs, ys = self.xScale, self.yScale
   x, y = floor(x*8*xs)/xs, floor(y*8*ys)/ys
-  love.graphics.setColor(b)
+  self:setColor(b)
   love.graphics.drawq( self.font, self.fontquads[219], x, y )
-  -- love.graphics.rectangle( "fill", x, y, 8, 8 )
-  love.graphics.setColor(c)
+  self:setColor(c)
   love.graphics.drawq( self.font, quad, x, y )
   return self
 end
 
-function Graphics:setColor(c, ...)
-  love.graphics.setColor( c, ... )
+function Graphics:write(x, y, c, b, s)
+  for ch in s:gmatch(".") do
+    self:drawChar(x, y, string.byte(ch), c, b)
+    x = x + 1
+  end
+end
+
+function Graphics:setColor(c)
+  if self.lastColor ~= c then
+    self.lastColor = c
+    love.graphics.setColor(c)
+  end
   return self
 end
 
 function Graphics:start()
   love.graphics.scale( Graphics.xScale, Graphics.yScale )
   love.graphics.setLine( Graphics.xScale, "smooth" )
-  love.graphics.setColor( 255, 255, 255 )
+  self:setColor( Color.WHITE )
   return self
 end
 

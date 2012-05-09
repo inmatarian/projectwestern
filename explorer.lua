@@ -37,8 +37,6 @@ function ExplorerState:update(dt)
   else
     self:checkPlayerInput()
     self.tileLayer:update(dt)
-    Game.Hugo:recoverMagicStep(1.0)
-    Game.Hugo:recoverHealthStep(1.0)
   end
 end
 

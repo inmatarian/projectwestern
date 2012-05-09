@@ -40,7 +40,7 @@ function MenuScreenState:popMenu()
   return self
 end
 
-function MenuScreenState:handleMainMenu( option )
+function MenuScreenState:handleMainMenu( index, option )
   if option == "System" then
     self:pushMenu( self.systemMenu )
   elseif option == "Status" then
@@ -54,17 +54,17 @@ function MenuScreenState:handleMainMenu( option )
   end
 end
 
-function MenuScreenState:handleStatusWhoMenu(option)
+function MenuScreenState:handleStatusWhoMenu( index, option )
   self:popMenu()
   self:pushMenu( CharacterStatusWindow(5, 5, self, self.popMenu) )
 end
 
-function MenuScreenState:handleLearnWhoMenu(option)
+function MenuScreenState:handleLearnWhoMenu( index, option )
   self:popMenu()
-  self:pushMenu( CharacterLearnWindow(5, 5) )
+  self:pushMenu( CharacterLearnWindow(5, 5, Game.players[index]) )
 end
 
-function MenuScreenState:handleSystemMenu( option )
+function MenuScreenState:handleSystemMenu( index, option )
   if option == "Back" then
     self:popMenu()
   end
@@ -129,8 +129,8 @@ PartyShortStatsWindow = MenuScreenWindow:clone {
   width = 10, height = 10, priority = 0
 }
 
-function PartyShortStatsWindow:drawCharacter( y, name, ps )
-  self:printf(1, y, name)
+function PartyShortStatsWindow:drawCharacter( y, ps )
+  self:printf(1, y, ps.name)
       :setColor(Color.CYAN)
       :set(6, y, ASCII.Delete)
       :printf(7, y, "%2i", ps.magicPoints )
@@ -144,10 +144,9 @@ function PartyShortStatsWindow:refresh()
   self:reset()
       :fill(ASCII.Space)
       :frame('single')
-      :drawCharacter( 1, "HUGO", Game.Hugo )
-      :drawCharacter( 3, "EVAN", Game.Hugo )
-      :drawCharacter( 5, "ANNA", Game.Hugo )
-      :drawCharacter( 7, "SARA", Game.Hugo )
+  for i, ps in ipairs(Game.players) do
+    self:drawCharacter( 1 + ((i-1)*2), ps )
+  end
   return self
 end
 
@@ -221,10 +220,10 @@ function MenuScreenMenuList:refresh()
   if self.orientation == "horizontal" then
     local x = 1
     for i, opt in ipairs(self.options) do
-      local selected = (i==self.selectionOption)
-      local back = selected and Color.MIDNIGHT or Color.BLACK
+      local selection = (i==self.selectionOption)
+      local back = selection and Color.MIDNIGHT or Color.BLACK
       self:setColor(Color.WHITE, back):printf(x+1, 1, opt)
-      if selected then self:set(x, 1, ASCII.Right_fat_arrow) end
+      if selection then self:set(x, 1, ASCII.Right_fat_arrow) end
       x = x + #opt + 1
     end
   else
@@ -243,7 +242,7 @@ function MenuScreenMenuList:update(dt)
 end
 
 function MenuScreenMenuList:selected( index )
-  self:doCallback( self.options[index] )
+  self:doCallback( index, self.options[index] )
 end
 
 ----------------------------------------
@@ -262,7 +261,14 @@ MenuScreenSystemMenu = MenuScreenMenuList:clone {
 MenuScreenWhoMenu = MenuScreenMenuList:clone {
   priority = 4,
   title = "Who?",
-  options = { "HUGO", "EVAN", "ANNA", "SARA" }
+  init = function(self,...)
+    local o = {}
+    for _, ps in ipairs(Game.players) do
+      o[#o+1] = ps.name
+    end
+    self.options = o
+    return MenuScreenWhoMenu:superinit(self, ...)
+  end
 }
 
 --------------------------------------------------------------------------------
@@ -273,7 +279,6 @@ MenuScreenDialog:mixin( CallbackMixin )
 function MenuScreenDialog:init( x, y, parent, callback )
   MenuScreenWindow:superinit(self, x, y)
   self:setCallback(parent, callback)
-  self:refresh()
   return self
 end
 
@@ -318,15 +323,21 @@ end
 ----------------------------------------
 
 CharacterLearnWindow = MenuScreenWindow:clone {
-  width = 30, height = 20, priority = 10
+  width = 30, height = 20, priority = 10,
+
+  classNames = {
+    "Squire",
+    "Knight",
+    "Alchemist",
+  }
 }
 
 CharacterLearnWindow:mixin( SelectionMixin )
 
-function CharacterLearnWindow:init( x, y )
-  self:initSelection( 12 )
+function CharacterLearnWindow:init( x, y, ps )
+  self:initSelection( #self.classNames )
+  self.playerStats = ps
   CharacterLearnWindow:superinit(self, x, y)
-  self:refresh()
   return self
 end
 
@@ -335,25 +346,23 @@ function CharacterLearnWindow:refresh()
       :fill(ASCII.Space)
       :frame('single')
       :horizLine('single', 0, 2, self.width)
-      :printf(2, 1, "NAME")
-      :printf(10, 1, "Tech Level 000/255")
+      :printf(2, 1, self.playerStats.name)
+      :printf(8, 1, "Level %2i", self.playerStats.techLevel)
+      :printf(18, 1, "Pts %2i", self.playerStats.techPoints)
       :horizLine('single', 0, self.height-3, self.width)
       :printf(2, self.height-2, "Exp: 999999")
       :printf(16, self.height-2, "Next: 999999")
       :vertLine('single', 14, self.height-3, 3)
-      :printf(3, 4, "ABCDEFGHIJKLMNOP")
-      :printf(3, 5, "ABCDEFGHIJKLMNOP")
-      :printf(3, 6, "ABCDEFGHIJKLMNOP")
-      :printf(3, 7, "ABCDEFGHIJKLMNOP")
-      :printf(3, 8, "ABCDEFGHIJKLMNOP")
-      :printf(3, 9, "ABCDEFGHIJKLMNOP")
-      :printf(3, 10, "ABCDEFGHIJKLMNOP")
-      :printf(3, 11, "ABCDEFGHIJKLMNOP")
-      :printf(3, 12, "ABCDEFGHIJKLMNOP")
-      :printf(3, 13, "ABCDEFGHIJKLMNOP")
-      :printf(3, 14, "ABCDEFGHIJKLMNOP")
-      :printf(3, 15, "ABCDEFGHIJKLMNOP")
-      :setColor(Color.WHITE, Color.BLACK)
+
+  for i, s in ipairs(self.classNames) do
+    self:printf(3, 3+i, s)
+    local val = self.playerStats.knowledge[i] or 0
+    for j = 1, val do
+      self:set( 19+j, 3+i, ASCII.Black_square )
+    end
+  end
+
+  self:setColor(Color.WHITE, Color.BLACK)
       :set(2, 3+self.selectionOption, ASCII.Right_fat_arrow)
   return self
 end
@@ -363,6 +372,10 @@ function CharacterLearnWindow:update(dt)
 end
 
 function CharacterLearnWindow:selected( index )
-  print( "CharacterLearnWindow:selected", index )
+  print( "CharacterLearnWindow:selected", index, self.classNames[index] )
+  local val = self.playerStats.knowledge[index]
+  val = math.min((val or 0) + 1, 8)
+  self.playerStats.knowledge[index] = val
+  self:refresh()
 end
 

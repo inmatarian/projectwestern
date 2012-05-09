@@ -111,7 +111,7 @@ function TileLayer:draw(dt)
   self:animateScroll(dt)
 
   Graphics:setClipping( self.x, self.y, self.viewWidth, self.viewHeight )
-  Graphics:setColor( 255, 255, 255 )
+  Graphics:setColor( Color.WHITE )
 
   local left, top, right, bottom = self:getDrawingParameters()
   for y = top, bottom do
