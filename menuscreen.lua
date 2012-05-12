@@ -6,10 +6,9 @@ function MenuScreenState:enter()
   self.playerStats = PartyShortStatsWindow( -12, 2 )
   self.moneyWin = MoneyShortStatsWindow( 30, 25 )
   self.mainMenu = MenuScreenMainMenu( 2, 2, self, self.handleMainMenu )
-  self.systemMenu = MenuScreenSystemMenu( 26, 4, self, self.handleSystemMenu )
+  self.systemMenu = MenuScreenSystemMenu( 4, 3, self, self.handleSystemMenu )
   self.menuStack = { self.mainMenu }
-  local test = TestColorsWindow( 2, 15 )
-  self:addLayer(self.playerStats, self.moneyWin, self.mainMenu, test)
+  self:addLayer(self.playerStats, self.moneyWin, self.mainMenu)
 end
 
 function MenuScreenState:draw(dt)
@@ -43,6 +42,8 @@ end
 function MenuScreenState:handleMainMenu( index, option )
   if option == "System" then
     self:pushMenu( self.systemMenu )
+  elseif option == "Items" then
+    self:pushMenu( MenuScreenItemsMenu() )
   elseif option == "Status" then
     local x, y = self.mainMenu.x, self.mainMenu.y
     self:pushMenu( MenuScreenWhoMenu(x+2, y+2, self, self.handleStatusWhoMenu) )
@@ -56,12 +57,12 @@ end
 
 function MenuScreenState:handleStatusWhoMenu( index, option )
   self:popMenu()
-  self:pushMenu( CharacterStatusWindow(5, 5, self, self.popMenu) )
+  self:pushMenu( CharacterStatusWindow(Game.players[index], self, self.popMenu) )
 end
 
 function MenuScreenState:handleLearnWhoMenu( index, option )
   self:popMenu()
-  self:pushMenu( CharacterLearnWindow(5, 5, Game.players[index]) )
+  self:pushMenu( CharacterLearnWindow(Game.players[index]) )
 end
 
 function MenuScreenState:handleSystemMenu( index, option )
@@ -73,7 +74,7 @@ end
 ----------------------------------------
 
 MenuScreenWindow = TextWindow:clone {
-  defaultChar = ASCII.Space
+  defaultChar = ASCII.Space,
 }
 
 function MenuScreenWindow:init( x, y )
@@ -99,17 +100,21 @@ CallbackMixin = {
 ----------------------------------------
 
 SelectionMixin = {
-  initSelection = function(self, max)
+  initSelection = function(self, max, columns)
     self.selectionOption = 1
+    self.selectionColumns = columns or 1
     self.selectionMax = max
     return self
   end,
   handleSelectionUpdate = function(self, dt)
     local dist = 0
-    if Input.tap.up or Input.tap.left then dist = -1
-    elseif Input.tap.down or Input.tap.right then dist = 1
-    elseif Input.tap.pageup then dist = -8
-    elseif Input.tap.pagedown then dist = 8
+    local col = self.selectionColumns
+    if Input.tap.up then dist = -col
+    elseif Input.tap.down then dist = col
+    elseif Input.tap.left then dist = -1
+    elseif Input.tap.right then dist = 1
+    elseif Input.tap.pageup then dist = -8 * col
+    elseif Input.tap.pagedown then dist = 8 * col
     elseif Input.tap.home then dist = -9001
     elseif Input.tap["end"] then dist = 9001
     elseif Input.tap.enter then
@@ -136,7 +141,7 @@ function PartyShortStatsWindow:drawCharacter( y, ps )
       :printf(7, y, "%2i", ps.magicPoints )
       :setColor(Color.WHITE)
       :set(1, y+1, ASCII.Heart, Color.RED)
-      :printf(2, y+1, "%3i/%i", ps.hitPoints, ps:maxHP())
+      :printf(2, y+1, "%3i/%i", ps.hitPoints, ps.maxHP)
   return self
 end
 
@@ -191,19 +196,17 @@ MenuScreenMenuList = TextWindow:clone {
 MenuScreenMenuList:mixin( CallbackMixin, SelectionMixin )
 
 function MenuScreenMenuList:init(x, y, parent, callback)
-  if self.orientation == "horizontal" then
-    self.height = 3
-    self.width = 2
-    for _, opt in ipairs(self.options) do
-      self.width = self.width + #opt + 1
-    end
-  else
-    self.height = 2 + #self.options
-    self.width = 0
-    for _, opt in ipairs(self.options) do
-      self.width = math.max( self.width, 3 + #opt )
-    end
+
+  self.height = 2 + #self.options
+  self.width = 0
+  for _, opt in ipairs(self.options) do
+    self.width = math.max( self.width, 3 + #opt )
   end
+  if self.title then
+    self.height = self.height + 2
+    self.width = math.max( self.width, 2 + #self.title )
+  end
+
   MenuScreenMenuList:superinit(self, x, y)
   self:setCallback( parent, callback )
   self:initSelection( #self.options )
@@ -215,25 +218,21 @@ function MenuScreenMenuList:refresh()
       :fill(ASCII.Space)
       :frame('single')
 
-  if self.title then self:printf(1, 0, self.title) end
-
-  if self.orientation == "horizontal" then
-    local x = 1
-    for i, opt in ipairs(self.options) do
-      local selection = (i==self.selectionOption)
-      local back = selection and Color.MIDNIGHT or Color.BLACK
-      self:setColor(Color.WHITE, back):printf(x+1, 1, opt)
-      if selection then self:set(x, 1, ASCII.Right_fat_arrow) end
-      x = x + #opt + 1
-    end
-  else
-    for i, opt in ipairs(self.options) do
-      local back = (i==self.selectionOption) and Color.MIDNIGHT or Color.BLACK
-      self:setColor(Color.WHITE, back):printf(2, i, opt)
-    end
-    self:setColor(Color.WHITE, Color.BLACK)
-        :set(1, self.selectionOption, ASCII.Right_fat_arrow)
+  local startLine = 0
+  if self.title then
+    self:printf(1, 1, self.title)
+    self:horizLine('single', 0, 2, self.width)
+    startLine = 2
   end
+
+  for i, opt in ipairs(self.options) do
+    local back = (i==self.selectionOption) and Color.MIDNIGHT or Color.BLACK
+    self:setColor(Color.WHITE, back):printf(2, startLine + i, opt)
+  end
+
+  self:setColor(Color.WHITE, Color.BLACK)
+      :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
+
   return self
 end
 
@@ -277,8 +276,9 @@ MenuScreenDialog = MenuScreenWindow:clone()
 MenuScreenDialog:mixin( CallbackMixin )
 
 function MenuScreenDialog:init( x, y, parent, callback )
-  MenuScreenWindow:superinit(self, x, y)
   self:setCallback(parent, callback)
+  MenuScreenWindow:superinit(self, x, y)
+  self:refresh()
   return self
 end
 
@@ -291,13 +291,27 @@ end
 ----------------------------------------
 
 CharacterStatusWindow = MenuScreenDialog:clone {
-  width = 28, height = 20, priority = 10,
+  width = 34, height = 24, priority = 10,
 }
 
+function CharacterStatusWindow:init(ps, ...)
+  self.playerStats = ps
+  return CharacterStatusWindow:superinit(self, "center", "center", ...)
+end
+
 function CharacterStatusWindow:refresh()
+  local ps = self.playerStats
   self:reset()
       :fill(ASCII.Space)
       :frame('single')
+      :horizLine('single', 0, 2, self.width)
+      :vertLine('single', 7, 0, 3)
+      :printf(2, 1, ps.name )
+
+      :printf(2, 3, "HP: %3i/%3i", ps.hitPoints, ps.maxHP)
+      :printf(2, 4, "Morale:  50")
+
+--[[
       :printf(1, 1, "NAME" )
       :printf(2, 2, "HP: 999/999")
       :printf(2, 3, "Morale:  50")
@@ -317,6 +331,8 @@ function CharacterStatusWindow:refresh()
       :printf(3,  16, "ABCDEFGHIJKLMNOP")
       :printf(3,  17, "ABCDEFGHIJKLMNOP")
       :printf(3,  18, "ABCDEFGHIJKLMNOP")
+
+]]
   return self
 end
 
@@ -334,10 +350,10 @@ CharacterLearnWindow = MenuScreenWindow:clone {
 
 CharacterLearnWindow:mixin( SelectionMixin )
 
-function CharacterLearnWindow:init( x, y, ps )
+function CharacterLearnWindow:init( ps, ... )
   self:initSelection( #self.classNames )
   self.playerStats = ps
-  CharacterLearnWindow:superinit(self, x, y)
+  CharacterLearnWindow:superinit(self, "center", "center", ...)
   return self
 end
 
@@ -378,4 +394,68 @@ function CharacterLearnWindow:selected( index )
   self.playerStats.knowledge[index] = val
   self:refresh()
 end
+
+--------------------------------------------------------------------------------
+
+MenuScreenItemsMenu = MenuScreenWindow:clone {
+  width = 38, height = 20, priority = 10,
+}
+
+MenuScreenItemsMenu:mixin( SelectionMixin )
+
+function MenuScreenItemsMenu:init( ... )
+  self:initSelection( Game.inventory.MAX, 2 )
+  MenuScreenItemsMenu:superinit(self, "center", "center", ...)
+  return self
+end
+
+function MenuScreenItemsMenu:itemLocation( index )
+  return 1 + ((index-1)%2) * 18, 1 + floor((index-1)/2)
+end
+
+function MenuScreenItemsMenu:refresh()
+  self:reset()
+      :fill(ASCII.Space)
+      :frame('single')
+      :horizLine('single', 0, self.height-3, self.width)
+
+  local inven = Game.inventory
+  for i = 1, inven.MAX do
+    local x, y = self:itemLocation(i)
+    self:printf( x+1, y, "%-14s:%2i",
+      inven:itemName(i):sub(1, 14), inven:quantity(i) )
+  end
+
+  self:printf(1, self.height-2, inven:itemDesc(self.selectionOption))
+
+  local opt = self.selectionOption
+  local sx, sy = self:itemLocation(opt)
+  if self.firstPick then
+    local fx, fy = self:itemLocation(self.firstPick)
+    self:setColor(Color.WHITE, Color.BLACK)
+        :set(fx, fy, ASCII.Right_fat_arrow)
+        :setColor(Color.YELLOW, Color.BLACK)
+        :set(sx, sy, ASCII.Right_fat_arrow)
+  else
+    self:setColor(Color.WHITE, Color.BLACK)
+        :set(sx, sy, ASCII.Right_fat_arrow)
+  end
+
+  return self
+end
+
+function MenuScreenItemsMenu:update(dt)
+  self:handleSelectionUpdate(dt)
+end
+
+function MenuScreenItemsMenu:selected( index )
+  if not self.firstPick then
+    self.firstPick = index
+  else
+    Game.inventory:swapItems( index, self.firstPick )
+    self.firstPick = nil
+  end
+  self:refresh()
+end
+
 

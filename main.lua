@@ -15,7 +15,7 @@ function bound(a, b, c) return (((b<a) and a) or (b>c) and c) or b end
 
 for _, M in ipairs {
   "util", "ascii", "object", "graphics", "input", "statemachine", "textwindow",
-  "tilelayer", "tile", "sprite", "explorer", "menuscreen", "battle"
+  "tilelayer", "tile", "sprite", "explorer", "menuscreen", "battle", "items"
 }
 do require(M) end
 
@@ -58,11 +58,11 @@ PlayerStats = Object:clone {
   statNames = {
     "name",
     "hitPoints",
+    "maxHP",
     "magicPoints",
-    "strength",
-    "intelligence",
-    "vitality",
-    "agility",
+    "vigor",
+    "acuity",
+    "speed",
     "techLevel",
     "techPoints",
     "experience"
@@ -74,10 +74,6 @@ function PlayerStats:init( datum )
     self[k] = datum[k] or 0
   end
   self.knowledge = {}
-end
-
-function PlayerStats:maxHP()
-  return math.max(15, math.min(999, 6*(self.vitality+1) + 4*(self.strength+1)))
 end
 
 function PlayerStats:recoverHealthStep( fraction )
@@ -101,14 +97,15 @@ end
 Game = {
   deltaTime = 0,
   focused = true,
+  inventory = Inventory(),
   HugoDatum = {
     name = "Hugo",
     hitPoints = 0,
+    maxHP = 30,
     magicPoints = 0,
-    strength = 10,
-    intelligence = 10,
-    vitality = 10,
-    agility = 10,
+    vigor = 10,
+    acuity = 10,
+    speed = 10,
     techLevel = 1,
     techPoints = 1,
     experience = 0

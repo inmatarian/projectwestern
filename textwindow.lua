@@ -9,12 +9,23 @@ TextWindow = Object:clone {
   background = Color.BLACK
 }
 
+local maxWidth, maxHeight = floor(Graphics.gameWidth/8), floor(Graphics.gameHeight/8)
+
 function TextWindow:init(x, y, w, h, priority, defaultChar)
-  print( "TextWindow:init", self, x, y, w, h, priority, defaultChar )
-  if x then self.x = (x >= 0) and x or floor((Graphics.gameWidth/8)+x) end
-  if y then self.y = (y >= 0) and y or floor((Graphics.gameHeight/8)+y) end
   if w then self.width = w end
   if h then self.height = h end
+
+  if x == "center" then
+    self.x = floor((maxWidth-self.width)/2)
+  elseif type(x)=="number" then
+    self.x = (x >= 0) and x or maxWidth+x
+  end
+  if y == "center" then
+    self.y = floor((maxHeight-self.height)/2)
+  elseif type(y)=="number" then
+    self.y = (y >= 0) and y or maxHeight+y
+  end
+
   if priority then self.priority = priority end
   if defaultChar then self.defaultChar = defaultChar end
   local size = self.width * self.height

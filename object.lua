@@ -6,7 +6,7 @@ function MT.__call(parent, ...)
 end
 
 function MT.__index(obj, key)
-  local parent = rawget(obj, "__parent")
+  local parent = rawget(obj, "__prototype")
   if parent then return parent[key] end
 end
 
@@ -22,12 +22,17 @@ end
 
 function Object:clone(body)
   body = body or {}
-  body.__parent = self
+  rawset(body, "__prototype", self)
   return setmetatable(body, MT)
 end
 
+function Object:become(obj)
+  rawset(self, "__prototype", obj)
+  return self
+end
+
 function Object:super()
-  return rawget(self, "__parent")
+  return rawget(self, "__prototype")
 end
 
 function Object:superinit(obj, ...)
