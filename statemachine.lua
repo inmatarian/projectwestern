@@ -39,6 +39,12 @@ function StateMachine:isEmpty()
   return ( #self.stack == 0 ) and ( #self.queue == 0 )
 end
 
+function StateMachine:clear()
+  local N, M = #self.stack, #self.queue
+  for i = 1, N do self.stack[i] = nil end
+  for i = 1, M do self.queue[i] = nil end
+end
+
 --------------------------------------------------------------------------------
 
 State = Object:clone {

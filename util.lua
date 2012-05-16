@@ -66,3 +66,51 @@ function Util.printr( val )
   print( Util.tostringr(val) )
 end
 
+
+do
+  local Signal_MT = {
+    __index = {
+      register = function(self, ...)
+        local i, N, C = 1, select('#', ...), #self.cb+1
+        while i <= N do
+          self.obj[C] = assert(select(i, ...))
+          self.cb[C] = assert(select(i+1, ...))
+          i, C = i+2, C+1
+        end
+        return self
+      end,
+      unregister = function(self, obj, callback)
+        assert(callback)
+        local i, N = 1, #self.cb
+        while i <= N do
+          if (self.obj[i] == obj) and (self.cb[i] == callback) then
+            table.remove( self.obj, i )
+            table.remove( self.cb, i )
+          else
+            i = i + 1
+          end
+        end
+        return self
+      end,
+    },
+    __call = function(self, ...)
+      local q = self.q
+      local i, j, N = 1, 1, #self.cb
+      while i <= N do
+        q[j], q[j+1] = self.cb[i], self.obj[i]
+        i, j = i+1, j+2
+      end
+      i, N = 1, j-2
+      while i <= N do
+        local f, o = q[i], q[i+1]
+        f(o, ...)
+        q[i], q[i+1] = nil, nil
+        i = i + 2
+      end
+    end
+  }
+  function Util.signal(...)
+    return setmetatable({obj={},cb={},q={}},Signal_MT):register(...)
+  end
+end
+

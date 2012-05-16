@@ -77,7 +77,7 @@ function BattleStatsWindow:drawCharacter( y, ps )
       :printf(7, y, "%2i", ps.magicPoints )
       :setColor(Color.WHITE)
       :set(1, y+1, ASCII.Heart, Color.RED)
-      :printf(2, y+1, "%3i/%i", ps.hitPoints, ps:maxHP())
+      :printf(2, y+1, "%3i/%i", ps.hitPoints, ps.maxHP)
   return self
 end
 

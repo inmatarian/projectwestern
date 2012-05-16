@@ -5,10 +5,10 @@ function MenuScreenState:enter()
   print("MenuScreenState:enter")
   self.playerStats = PartyShortStatsWindow( -12, 2 )
   self.moneyWin = MoneyShortStatsWindow( 30, 25 )
-  self.mainMenu = MenuScreenMainMenu( 2, 2, self, self.handleMainMenu )
-  self.systemMenu = MenuScreenSystemMenu( 4, 3, self, self.handleSystemMenu )
-  self.menuStack = { self.mainMenu }
-  self:addLayer(self.playerStats, self.moneyWin, self.mainMenu)
+  self.mainMenu = MenuScreenMainMenu( 2, 2, self )
+  self.menuStack = {}
+  self:addLayer(self.playerStats, self.moneyWin)
+  self:pushMenu( self.mainMenu )
 end
 
 function MenuScreenState:draw(dt)
@@ -21,6 +21,7 @@ function MenuScreenState:update(dt)
     self:popMenu()
     if #self.menuStack <= 0 then
       StateMachine:pop()
+      collectgarbage()
     end
   else
     self.menuStack[#self.menuStack]:update(dt)
@@ -39,94 +40,28 @@ function MenuScreenState:popMenu()
   return self
 end
 
-function MenuScreenState:handleMainMenu( index, option )
-  if option == "System" then
-    self:pushMenu( self.systemMenu )
-  elseif option == "Items" then
-    self:pushMenu( MenuScreenItemsMenu() )
-  elseif option == "Status" then
-    local x, y = self.mainMenu.x, self.mainMenu.y
-    self:pushMenu( MenuScreenWhoMenu(x+2, y+2, self, self.handleStatusWhoMenu) )
-  elseif option == "Learn" then
-    local x, y = self.mainMenu.x, self.mainMenu.y
-    self:pushMenu( MenuScreenWhoMenu(x+2, y+2, self, self.handleLearnWhoMenu) )
-  elseif option == "Return" then
-    StateMachine:pop()
-  end
-end
-
-function MenuScreenState:handleStatusWhoMenu( index, option )
-  self:popMenu()
-  self:pushMenu( CharacterStatusWindow(Game.players[index], self, self.popMenu) )
-end
-
-function MenuScreenState:handleLearnWhoMenu( index, option )
-  self:popMenu()
-  self:pushMenu( CharacterLearnWindow(Game.players[index]) )
-end
-
-function MenuScreenState:handleSystemMenu( index, option )
-  if option == "Back" then
-    self:popMenu()
-  end
-end
-
 ----------------------------------------
 
 MenuScreenWindow = TextWindow:clone {
   defaultChar = ASCII.Space,
 }
 
-function MenuScreenWindow:init( x, y )
+function MenuScreenWindow:init( x, y, parent )
   MenuScreenWindow:superinit(self, x, y)
+  self.parent = parent
   self:refresh()
   return self
 end
 
-----------------------------------------
+function MenuScreenWindow:pushMenu( menu )
+  self.parent:pushMenu(menu)
+  return self
+end
 
-CallbackMixin = {
-  setCallback = function(self, parent, callback)
-    self.callbackParent = parent
-    self.callbackFunction = callback or NULLFUNC
-    return self
-  end,
-  doCallback = function(self, ...)
-    self.callbackFunction( self.callbackParent, ... )
-    return self
-  end
-}
-
-----------------------------------------
-
-SelectionMixin = {
-  initSelection = function(self, max, columns)
-    self.selectionOption = 1
-    self.selectionColumns = columns or 1
-    self.selectionMax = max
-    return self
-  end,
-  handleSelectionUpdate = function(self, dt)
-    local dist = 0
-    local col = self.selectionColumns
-    if Input.tap.up then dist = -col
-    elseif Input.tap.down then dist = col
-    elseif Input.tap.left then dist = -1
-    elseif Input.tap.right then dist = 1
-    elseif Input.tap.pageup then dist = -8 * col
-    elseif Input.tap.pagedown then dist = 8 * col
-    elseif Input.tap.home then dist = -9001
-    elseif Input.tap["end"] then dist = 9001
-    elseif Input.tap.enter then
-      self:selected( self.selectionOption )
-    end
-    if dist ~= 0 then
-      self.selectionOption = bound(1, self.selectionOption+dist, self.selectionMax)
-      self:refresh()
-    end
-    return self
-  end
-}
+function MenuScreenWindow:popMenu()
+  self.parent:popMenu()
+  return self
+end
 
 ----------------------------------------
 
@@ -171,32 +106,53 @@ end
 
 ----------------------------------------
 
-TestColorsWindow = MenuScreenWindow:clone {
-  width = 24, height = 3, priority = 1,
-}
-
-function TestColorsWindow:refresh()
-  self:reset():frame('single')
-  local i = 1
-  for _, v in pairs(Color) do
-    self:set( i, 1, ASCII.Full_block, v )
-    i = i + 1
+SelectionMixin = {
+  initSelection = function(self, max, columns)
+    self.selectionOption = 1
+    self.selectionColumns = columns or 1
+    self.selectionMax = max
+    return self
+  end,
+  handleSelectionUpdate = function(self, dt)
+    local dist = 0
+    local col = self.selectionColumns
+    if Input.tap.up then dist = -col
+    elseif Input.tap.down then dist = col
+    elseif Input.tap.left then dist = -1
+    elseif Input.tap.right then dist = 1
+    elseif Input.tap.pageup then dist = -8 * col
+    elseif Input.tap.pagedown then dist = 8 * col
+    elseif Input.tap.home then dist = -9001
+    elseif Input.tap["end"] then dist = 9001
+    elseif Input.tap.enter then
+      self:selected( self.selectionOption )
+    end
+    if dist ~= 0 then
+      self.selectionOption = bound(1, self.selectionOption+dist, self.selectionMax)
+      self:refresh()
+    end
+    return self
   end
-  return self
-end
+}
 
 ----------------------------------------
 
-MenuScreenMenuList = TextWindow:clone {
+MenuScreenMenuList = MenuScreenWindow:clone {
   priority = 2, selection = 1,
   defaultChar = ASCII.Space,
   options = { "Return" }
 }
 
-MenuScreenMenuList:mixin( CallbackMixin, SelectionMixin )
+MenuScreenMenuList:mixin( SelectionMixin )
 
-function MenuScreenMenuList:init(x, y, parent, callback)
+function MenuScreenMenuList:init(x, y, parent, signal)
+  self.signal = signal
+  self:initSelection( #self.options )
+  self:recalculateSize()
+  return MenuScreenMenuList:superinit(self, x, y, parent)
+end
 
+function MenuScreenMenuList:recalculateSize()
   self.height = 2 + #self.options
   self.width = 0
   for _, opt in ipairs(self.options) do
@@ -206,11 +162,7 @@ function MenuScreenMenuList:init(x, y, parent, callback)
     self.height = self.height + 2
     self.width = math.max( self.width, 2 + #self.title )
   end
-
-  MenuScreenMenuList:superinit(self, x, y)
-  self:setCallback( parent, callback )
-  self:initSelection( #self.options )
-  self:refresh()
+  return self
 end
 
 function MenuScreenMenuList:refresh()
@@ -241,62 +193,98 @@ function MenuScreenMenuList:update(dt)
 end
 
 function MenuScreenMenuList:selected( index )
-  self:doCallback( index, self.options[index] )
+  self.signal( index, self.options[index] )
 end
 
 ----------------------------------------
 
 MenuScreenMainMenu = MenuScreenMenuList:clone {
   priority = 2,
-  options = { "Status", "Items", "Ability", "Equip", "Learn", "Order", "System" }
+  options = { "Status", "Items", "Ability", "Equip", "Learn", "Order", "System" },
+  handlers = {
+    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.statusWho) end;
+    function(self, x, y) return MenuScreenItemsMenu(self) end;
+    function(self, x, y) return end;
+    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.equipWho) end;
+    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.learnWho) end;
+    function(self, x, y) return end;
+    function(self, x, y) return MenuScreenSystemMenu( 4, 3, self ) end;
+  }
 }
 
-MenuScreenSystemMenu = MenuScreenMenuList:clone {
-  priority = 3,
-  title = "System",
-  options = { "Save", "Reset", "Quit", "Back" }
-}
-
-MenuScreenWhoMenu = MenuScreenMenuList:clone {
-  priority = 4,
-  title = "Who?",
-  init = function(self,...)
-    local o = {}
-    for _, ps in ipairs(Game.players) do
-      o[#o+1] = ps.name
-    end
-    self.options = o
-    return MenuScreenWhoMenu:superinit(self, ...)
-  end
-}
-
---------------------------------------------------------------------------------
-
-MenuScreenDialog = MenuScreenWindow:clone()
-MenuScreenDialog:mixin( CallbackMixin )
-
-function MenuScreenDialog:init( x, y, parent, callback )
-  self:setCallback(parent, callback)
-  MenuScreenWindow:superinit(self, x, y)
-  self:refresh()
-  return self
+function MenuScreenMainMenu:init(x, y, parent)
+  self.signals = {
+    statusWho = Util.signal( self, self.handleStatusWhoMenu ),
+    equipWho = Util.signal( self, self.handleEquipWhoMenu ),
+    learnWho = Util.signal( self, self.handleLearnWhoMenu ),
+  }
+  return MenuScreenMainMenu:superinit(self, x, y, parent, Util.signal(self, self.handleMenu))
 end
 
-function MenuScreenDialog:update(dt)
-  if Input.tap.enter or Input.tap.escape then
-    self:doCallback()
+function MenuScreenMainMenu:handleMenu( index, option )
+  local screen = self.handlers[index](self, self.x, self.y)
+  if screen then
+    self:pushMenu( screen )
+  end
+end
+
+function MenuScreenMainMenu:handleStatusWhoMenu( index, option )
+  self:popMenu():pushMenu( CharacterStatusWindow(Game.players[index], self) )
+end
+
+function MenuScreenMainMenu:handleLearnWhoMenu( index, option )
+  self:popMenu():pushMenu( CharacterLearnWindow(Game.players[index], self) )
+end
+
+function MenuScreenMainMenu:handleEquipWhoMenu( index, option )
+  self:popMenu():pushMenu( CharacterEquipWindow(Game.players[index], self) )
+end
+
+----------------------------------------
+
+MenuScreenSystemMenu = MenuScreenMenuList:clone {
+  priority = 3, title = "System",
+  options = { "Save", "Reset", "Quit", "Back" },
+}
+
+function MenuScreenSystemMenu:init(x, y, parent)
+  return MenuScreenSystemMenu:superinit(self, x, y, parent, Util.signal(self, self.handle))
+end
+
+function MenuScreenSystemMenu:handle( index, option )
+  if option == "Quit" then
+    Game:quit()
+  elseif option == "Reset" then
+    Game:reset()
+  elseif option == "Back" then
+    self:popMenu()
   end
 end
 
 ----------------------------------------
 
-CharacterStatusWindow = MenuScreenDialog:clone {
+MenuScreenWhoMenu = MenuScreenMenuList:clone {
+  priority = 4, title = "Who?"
+}
+
+function MenuScreenWhoMenu:init(...)
+  local o = {}
+  for _, ps in ipairs(Game.players) do
+    o[#o+1] = ps.name
+  end
+  self.options = o
+  return MenuScreenWhoMenu:superinit(self, ...)
+end
+
+----------------------------------------
+
+CharacterStatusWindow = MenuScreenWindow:clone {
   width = 34, height = 24, priority = 10,
 }
 
-function CharacterStatusWindow:init(ps, ...)
+function CharacterStatusWindow:init(ps, parent)
   self.playerStats = ps
-  return CharacterStatusWindow:superinit(self, "center", "center", ...)
+  return CharacterStatusWindow:superinit(self, "center", "center", parent)
 end
 
 function CharacterStatusWindow:refresh()
@@ -336,6 +324,12 @@ function CharacterStatusWindow:refresh()
   return self
 end
 
+function CharacterStatusWindow:update(dt)
+  if Input.tap.enter or Input.tap.escape then
+    self:popMenu()
+  end
+end
+
 ----------------------------------------
 
 CharacterLearnWindow = MenuScreenWindow:clone {
@@ -350,10 +344,10 @@ CharacterLearnWindow = MenuScreenWindow:clone {
 
 CharacterLearnWindow:mixin( SelectionMixin )
 
-function CharacterLearnWindow:init( ps, ... )
+function CharacterLearnWindow:init( ps, parent )
   self:initSelection( #self.classNames )
   self.playerStats = ps
-  CharacterLearnWindow:superinit(self, "center", "center", ...)
+  CharacterLearnWindow:superinit(self, "center", "center", parent)
   return self
 end
 
@@ -395,7 +389,7 @@ function CharacterLearnWindow:selected( index )
   self:refresh()
 end
 
---------------------------------------------------------------------------------
+----------------------------------------
 
 MenuScreenItemsMenu = MenuScreenWindow:clone {
   width = 38, height = 20, priority = 10,
@@ -403,9 +397,9 @@ MenuScreenItemsMenu = MenuScreenWindow:clone {
 
 MenuScreenItemsMenu:mixin( SelectionMixin )
 
-function MenuScreenItemsMenu:init( ... )
+function MenuScreenItemsMenu:init( parent )
   self:initSelection( Game.inventory.MAX, 2 )
-  MenuScreenItemsMenu:superinit(self, "center", "center", ...)
+  MenuScreenItemsMenu:superinit(self, "center", "center", parent)
   return self
 end
 
@@ -458,4 +452,34 @@ function MenuScreenItemsMenu:selected( index )
   self:refresh()
 end
 
+----------------------------------------
+
+CharacterEquipWindow = MenuScreenWindow:clone {
+  width = 38, height = 20, priority = 10,
+}
+
+CharacterEquipWindow:mixin( SelectionMixin )
+
+function CharacterEquipWindow:init( ps, parent )
+  self.playerStats = ps
+  self:initSelection( 1 )
+  CharacterEquipWindow:superinit(self, "center", "center", parent)
+  return self
+end
+
+function CharacterEquipWindow:refresh()
+  self:reset()
+      :fill(ASCII.Space)
+      :frame('single')
+
+  return self
+end
+
+function CharacterEquipWindow:update(dt)
+  self:handleSelectionUpdate(dt)
+end
+
+function CharacterEquipWindow:selected(index)
+
+end
 

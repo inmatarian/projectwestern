@@ -14,7 +14,7 @@ function bound(a, b, c) return (((b<a) and a) or (b>c) and c) or b end
 --------------------------------------------------------------------------------
 
 for _, M in ipairs {
-  "util", "ascii", "object", "graphics", "input", "statemachine", "textwindow",
+  "object", "util", "ascii", "graphics", "input", "statemachine", "textwindow",
   "tilelayer", "tile", "sprite", "explorer", "menuscreen", "battle", "items"
 }
 do require(M) end
@@ -115,15 +115,7 @@ Game = {
 function Game.init()
   Graphics:init()
   Input:init()
-
-  Game.players = {
-    PlayerStats( Game.HugoDatum ),
-    PlayerStats( Game.HugoDatum ),
-    PlayerStats( Game.HugoDatum ),
-    PlayerStats( Game.HugoDatum )
-  }
-
-  StateMachine:push( ExplorerState() )
+  Game:reset()
 end
 
 function Game.update(dt)
@@ -140,7 +132,7 @@ function Game.update(dt)
     elseif Input.tap.f9 then
       error("Debug crash!")
     elseif Input.tap.f10 then
-      love.event.quit()
+      Game:quit()
     end
 
     StateMachine:send( E.update, dt )
@@ -168,6 +160,24 @@ end
 
 function Game.focus(f)
   Game.focused = f
+end
+
+function Game:reset()
+  Game.players = {
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum ),
+    PlayerStats( Game.HugoDatum )
+  }
+
+  StateMachine:clear()
+  StateMachine:push( ExplorerState() )
+
+  collectgarbage()
+end
+
+function Game:quit()
+  love.event.quit()
 end
 
 --------------------------------------------------------------------------------
