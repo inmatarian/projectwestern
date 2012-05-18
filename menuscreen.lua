@@ -1,13 +1,14 @@
 
 MenuScreenState = State:clone {}
+MenuScreenState:mixin(MenuStackMixin)
 
 function MenuScreenState:enter()
   print("MenuScreenState:enter")
   self.playerStats = PartyShortStatsWindow( -12, 2 )
   self.moneyWin = MoneyShortStatsWindow( 30, 25 )
   self.mainMenu = MenuScreenMainMenu( 2, 2, self )
-  self.menuStack = {}
   self:addLayer(self.playerStats, self.moneyWin)
+  self:initMenuStack()
   self:pushMenu( self.mainMenu )
 end
 
@@ -19,25 +20,13 @@ end
 function MenuScreenState:update(dt)
   if Input.tap.escape then
     self:popMenu()
-    if #self.menuStack <= 0 then
+    if self:menuStackEmpty() then
       StateMachine:pop()
       collectgarbage()
     end
   else
-    self.menuStack[#self.menuStack]:update(dt)
+    self:updateMenu(dt)
   end
-end
-
-function MenuScreenState:pushMenu( menu )
-  table.insert(self.menuStack, menu)
-  self:addLayer(menu)
-  return self
-end
-
-function MenuScreenState:popMenu()
-  local menu = table.remove(self.menuStack)
-  self:removeLayer(menu)
-  return self
 end
 
 function MenuScreenState:refresh()
@@ -47,35 +36,7 @@ end
 
 ----------------------------------------
 
-MenuScreenWindow = TextWindow:clone {
-  defaultChar = ASCII.Space,
-}
-
-function MenuScreenWindow:init( x, y, parent )
-  MenuScreenWindow:superinit(self, x, y)
-  self.parent = parent
-  self:refresh()
-  return self
-end
-
-function MenuScreenWindow:pushMenu( menu )
-  self.parent:pushMenu(menu)
-  return self
-end
-
-function MenuScreenWindow:popMenu()
-  self.parent:popMenu()
-  return self
-end
-
-function MenuScreenWindow:refreshAll()
-  self.parent:refresh()
-  self:refresh()
-end
-
-----------------------------------------
-
-PartyShortStatsWindow = MenuScreenWindow:clone {
+PartyShortStatsWindow = WindowWidget:clone {
   width = 10, height = 10, priority = 0
 }
 
@@ -102,7 +63,7 @@ end
 
 ----------------------------------------
 
-MoneyShortStatsWindow = MenuScreenWindow:clone {
+MoneyShortStatsWindow = WindowWidget:clone {
   width = 8, height = 3, priority = 1
 }
 
@@ -116,113 +77,7 @@ end
 
 ----------------------------------------
 
-SelectionMixin = {
-  initSelection = function(self, max, columns, rows)
-    self.selectionOption = 1
-    self.selectionFirst = 1
-    self.selectionColumns = columns or 1
-    self.selectionRows = rows or max
-    self.selectionMax = max
-    return self
-  end,
-  handleSelectionUpdate = function(self, dt)
-    local dist = 0
-    local col = self.selectionColumns
-    if Input.tap.up then dist = -col
-    elseif Input.tap.down then dist = col
-    elseif Input.tap.left then dist = -1
-    elseif Input.tap.right then dist = 1
-    elseif Input.tap.pageup then dist = -(self.selectionRows-1) * col
-    elseif Input.tap.pagedown then dist = (self.selectionRows-1) * col
-    elseif Input.tap.home then dist = -9001
-    elseif Input.tap["end"] then dist = 9001
-    elseif Input.tap.enter then
-      self:selected( self.selectionOption )
-    end
-    if dist ~= 0 then
-      self.selectionOption = bound(1, self.selectionOption+dist, self.selectionMax)
-      if self.selectionOption > (self.selectionFirst+self.selectionRows-1) then
-        self.selectionFirst = self.selectionOption - self.selectionRows+1
-      elseif self.selectionOption < self.selectionFirst then
-        self.selectionFirst = self.selectionOption
-      end
-      self:refresh()
-    end
-    return self
-  end
-}
-
-----------------------------------------
-
-MenuScreenMenuList = MenuScreenWindow:clone {
-  priority = 2, selection = 1,
-  defaultChar = ASCII.Space,
-  options = { "Return" }
-}
-
-MenuScreenMenuList:mixin( SelectionMixin )
-
-function MenuScreenMenuList:init(x, y, parent, signal)
-  self.signal = signal
-  self:initSelection( #self.options )
-  self:recalculateSize()
-  return MenuScreenMenuList:superinit(self, x, y, parent)
-end
-
-function MenuScreenMenuList:recalculateSize()
-  self.height = 2 + #self.options
-  self.width = 0
-  for _, opt in ipairs(self.options) do
-    self.width = math.max( self.width, 3 + #opt )
-  end
-  if self.title then
-    self.height = self.height + 2
-    self.width = math.max( self.width, 2 + #self.title )
-  end
-  return self
-end
-
-function MenuScreenMenuList:refresh()
-  self:reset()
-      :fill(ASCII.Space)
-      :frame('single')
-
-  local startLine = 0
-  if self.title then
-    self:printf(1, 1, self.title)
-    self:horizLine('single', 0, 2, self.width)
-    startLine = 2
-  end
-
-  for i, opt in ipairs(self.options) do
-    local back = (i==self.selectionOption) and Color.MIDNIGHT or Color.BLACK
-    self:setColor(Color.WHITE, back):printf(2, startLine + i, opt)
-  end
-
-  if self.firstPick then
-    self:setColor(Color.WHITE, Color.BLACK)
-        :set(1, startLine + self.firstPick, ASCII.Right_fat_arrow)
-        :setColor(Color.YELLOW, Color.BLACK)
-        :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
-  else
-    self:setColor(Color.WHITE, Color.BLACK)
-        :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
-  end
-
-  return self
-end
-
-function MenuScreenMenuList:update(dt)
-  self:handleSelectionUpdate(dt)
-end
-
-function MenuScreenMenuList:selected( index )
-  self.signal( index, self.options[index] )
-end
-
-----------------------------------------
-
-MenuScreenMainMenu = MenuScreenMenuList:clone {
+MenuScreenMainMenu = MenuListWidget:clone {
   priority = 2,
   options = { "Status", "Items", "Ability", "Equip", "Learn", "Order", "System" },
   handlers = {
@@ -266,7 +121,7 @@ end
 
 ----------------------------------------
 
-MenuScreenSystemMenu = MenuScreenMenuList:clone {
+MenuScreenSystemMenu = MenuListWidget:clone {
   priority = 3, title = "System",
   options = { "Save", "Reset", "Quit", "Back" },
 }
@@ -284,7 +139,7 @@ end
 
 ----------------------------------------
 
-MenuScreenWhoMenu = MenuScreenMenuList:clone {
+MenuScreenWhoMenu = MenuListWidget:clone {
   priority = 4, title = "Who?"
 }
 
@@ -317,7 +172,7 @@ end
 
 ----------------------------------------
 
-CharacterStatusWindow = MenuScreenWindow:clone {
+CharacterStatusWindow = WindowWidget:clone {
   width = 34, height = 24, priority = 10,
 }
 
@@ -365,7 +220,7 @@ end
 
 ----------------------------------------
 
-CharacterLearnWindow = MenuScreenWindow:clone {
+CharacterLearnWindow = WindowWidget:clone {
   width = 30, height = 20, priority = 10,
 
   classNames = {
@@ -430,7 +285,7 @@ end
 
 ----------------------------------------
 
-MenuScreenItemsMenu = MenuScreenWindow:clone {
+MenuScreenItemsMenu = WindowWidget:clone {
   width = 38, height = 20, priority = 10,
 }
 
@@ -493,7 +348,7 @@ end
 
 ----------------------------------------
 
-CharacterEquipWindow = MenuScreenWindow:clone {
+CharacterEquipWindow = WindowWidget:clone {
   width = 38, height = 20, priority = 10,
 }
 

@@ -1,5 +1,6 @@
 
 BattleState = State:clone {}
+BattleState:mixin(MenuStackMixin)
 
 function BattleState:enter()
   self.screen = TextWindow( 0, 0, 30, floor(Graphics.gameHeight/8) )
@@ -10,55 +11,119 @@ function BattleState:enter()
   self.world:selfCenter():setSpriteWorld(self.spriteWorld)
   self.spriteWorld:setTileLayer( self.world )
 
-  self.sprites = {
-    BattlePlayer( 4, 5, self ),
-    BattleEnemy( 8, 5, self )
-  }
+  self.playerSprites = {}
+  self.enemySprites = {}
 
-  for _, spr in ipairs(self.sprites) do
-    self.spriteWorld:addSprite(spr)
-  end
+  self:addPlayerSprite( BattlePlayer( 4, 5, self ) )
+  self:addEnemySprite( BattleEnemy( 8, 5, self ) )
 
-  self.turn = 1
-  self.roster = {}
+  self.playerRoster = {}
   for _, ps in ipairs(Game.players) do
-    self.roster[#self.roster+1] = ps:clone()
+    self.playerRoster[#self.playerRoster+1] = ps:clone()
   end
 
-  self.stats = BattleStatsWindow( self.roster )
-  self:addLayer(self.screen, self.world, self.stats, Snitch())
+  self.enemyRoster = {}
+
+  self.turn = "player"
+  self.playerSwitch = 1
+  self.mode = "move"
+
+  self:addLayer(self.screen, self.world, Snitch())
+
+  self.stats = BattleStatsWindow( self.playerRoster, self.enemyRoster )
+  self.battleMainMenu = BattleMainMenu( 30, 24, self, Util.signal() )
+  self:initMenuStack()
+  self:pushMenu( self.stats )
+end
+
+function BattleState:addPlayerSprite(spr)
+  table.insert(self.playerSprites, spr)
+  self.spriteWorld:addSprite(spr)
+  return self
+end
+
+function BattleState:addEnemySprite(spr)
+  table.insert(self.enemySprites, spr)
+  self.spriteWorld:addSprite(spr)
+  return self
 end
 
 function BattleState:update(dt)
   if Input.tap.escape then
     StateMachine:pop()
   else
-    local who = self.sprites[self.turn]
-    if not who.selected then
-      who.selected = true
-      who:startTurn()
+    if self.turn == "player" then
+      self:runPlayerTurn(dt)
+    else
+      self:runEnemyTurn(dt)
     end
-    local done = who:runLogic(dt)
-    if done then self:advanceTurn() end
   end
 end
 
+function BattleState:runPlayerTurn(dt)
+  local who = self.playerSprites[self.playerSwitch]
+  if not who.selected then
+    who.selected = true
+    who:startTurn()
+  end
+  if self.mode == "move" then
+    if Input.tap.enter then
+      self:setMode("menu")
+    else
+      who:runLogic(dt)
+    end
+  elseif self.mode == "menu" then
+    if Input.tap.enter then
+      self:advanceTurn()
+    else
+      self:updateMenu(dt)
+    end
+  end
+end
+
+function BattleState:runEnemyTurn(dt)
+  local who = self.enemySprites[1]
+  if not who.selected then
+    who.selected = true
+    who:startTurn()
+  end
+  local done = who:runLogic(dt)
+  if done then self:advanceTurn() end
+end
+
 function BattleState:advanceTurn()
-  self.sprites[self.turn].selected = false
-  self.turn = self.turn + 1
-  if self.turn > #self.sprites then self.turn = 1 end
+  if self.turn == "player" then
+    self:popAllMenus( self.stats )
+    for _, spr in pairs(self.playerSprites) do
+      spr.selected = false
+    end
+    self.turn = "enemy"
+  else
+    for _, spr in pairs(self.enemySprites) do
+      spr.selected = false
+    end
+    self.turn = "player"
+    self.playerSwitch = 1
+    self:setMode("move")
+  end
+end
+
+function BattleState:setMode(m)
+  self.mode = m
+  if m == "menu" then
+    self:pushMenu( self.battleMainMenu )
+  end
 end
 
 ----------------------------------------
 
-BattleStatsWindow = TextWindow:clone {
+BattleStatsWindow = WindowWidget:clone {
   x = 30, y = 0, width = 10, height = 30
 }
 
-function BattleStatsWindow:init(roster)
-  BattleStatsWindow:superinit(self)
-  self.roster = roster
-  return self:refresh()
+function BattleStatsWindow:init( playerRoster, enemyRoster, parent )
+  self.roster = playerRoster
+  return BattleStatsWindow:superinit(self, self.x, self.y, parent)
 end
 
 function BattleStatsWindow:refresh()
@@ -66,14 +131,9 @@ function BattleStatsWindow:refresh()
       :fill(ASCII.Space)
       :frame('single')
       :horizLine('single', 0, 9, self.width)
-      :horizLine('single', 0, 24, self.width)
-
   for i, ps in ipairs(Game.players) do
     self:drawCharacter( 1 + ((i-1)*2), ps )
   end
-
-  self:drawMenu()
-
   return self
 end
 
@@ -88,13 +148,11 @@ function BattleStatsWindow:drawCharacter( y, ps )
   return self
 end
 
-function BattleStatsWindow:drawMenu()
-  self:printf(2, 25, "Action")
-  self:printf(2, 26, "Move")
-  self:printf(2, 27, "Switch")
-  self:printf(2, 28, "End")
-  return self
-end
+----------------------------------------
+
+BattleMainMenu = MenuListWidget:clone {
+  priority = 5, options = { "Action", "Move", "Switch", "End" }
+}
 
 ----------------------------------------
 
@@ -182,8 +240,6 @@ function BattlePlayer:runLogic()
     self:tryMove( -1, 0 )
   elseif Input.tap.right then
     self:tryMove( 1, 0 )
-  elseif Input.tap.enter then
-    return true
   end
 end
 
