@@ -81,11 +81,11 @@ MenuScreenMainMenu = MenuListWidget:clone {
   priority = 2,
   options = { "Status", "Items", "Ability", "Equip", "Learn", "Order", "System" },
   handlers = {
-    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.statusWho) end;
+    function(self, x, y) return MenuWhoWidget(x+2, y+2, self, self.signals.statusWho) end;
     function(self, x, y) return MenuScreenItemsMenu(self) end;
     function(self, x, y) return end;
-    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.equipWho) end;
-    function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.learnWho) end;
+    function(self, x, y) return MenuWhoWidget(x+2, y+2, self, self.signals.equipWho) end;
+    function(self, x, y) return MenuWhoWidget(x+2, y+2, self, self.signals.learnWho) end;
     function(self, x, y) return MenuScreenOrderMenu(x+4, y+4, self) end;
     function(self, x, y) return MenuScreenSystemMenu( 4, 3, self ) end;
   }
@@ -107,15 +107,15 @@ function MenuScreenMainMenu:handleMenu( index, option )
   end
 end
 
-function MenuScreenMainMenu:handleStatusWhoMenu( index, option )
+function MenuScreenMainMenu:handleStatusWhoMenu( index )
   self:popMenu():pushMenu( CharacterStatusWindow(Game.players[index], self) )
 end
 
-function MenuScreenMainMenu:handleLearnWhoMenu( index, option )
+function MenuScreenMainMenu:handleLearnWhoMenu( index )
   self:popMenu():pushMenu( CharacterLearnWindow(Game.players[index], self) )
 end
 
-function MenuScreenMainMenu:handleEquipWhoMenu( index, option )
+function MenuScreenMainMenu:handleEquipWhoMenu( index )
   self:popMenu():pushMenu( CharacterEquipWindow(Game.players[index], self) )
 end
 
@@ -139,22 +139,7 @@ end
 
 ----------------------------------------
 
-MenuScreenWhoMenu = MenuListWidget:clone {
-  priority = 4, title = "Who?"
-}
-
-function MenuScreenWhoMenu:init(...)
-  local o = {}
-  for _, ps in ipairs(Game.players) do
-    o[#o+1] = ps.name
-  end
-  self.options = o
-  return MenuScreenWhoMenu:superinit(self, ...)
-end
-
-----------------------------------------
-
-MenuScreenOrderMenu = MenuScreenWhoMenu:clone {
+MenuScreenOrderMenu = MenuWhoWidget:clone {
   title = "Order"
 }
 

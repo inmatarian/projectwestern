@@ -240,11 +240,15 @@ end
 SelectionMixin = {
 
   initSelection = function(self, max, columns, rows)
-    self.selectionOption = 1
-    self.selectionFirst = 1
     self.selectionColumns = columns or 1
     self.selectionRows = rows or max
     self.selectionMax = max
+    return self:resetSelection()
+  end,
+
+  resetSelection = function(self)
+    self.selectionOption = 1
+    self.selectionFirst = 1
     return self
   end,
 
@@ -381,7 +385,24 @@ function MenuListWidget:update(dt)
 end
 
 function MenuListWidget:selected( index )
-  self.signal( index, self.options[index] )
+  if self.signal then
+    self.signal( index, self.options[index] )
+  end
+end
+
+--------------------------------------------------------------------------------
+
+MenuWhoWidget = MenuListWidget:clone {
+  priority = 50, title = "Who?"
+}
+
+function MenuWhoWidget:init(...)
+  local o = {}
+  for _, ps in ipairs(Game.players) do
+    o[#o+1] = ps.name
+  end
+  self.options = o
+  return MenuWhoWidget:superinit(self, ...)
 end
 
 --------------------------------------------------------------------------------
@@ -393,6 +414,7 @@ MenuStackMixin = {
   end,
 
   pushMenu = function( self, menu )
+    assert(menu)
     local N = #self.menuStack
     if N > 0 then self.menuStack[N]:loseFocus() end
     table.insert(self.menuStack, menu)

@@ -15,6 +15,9 @@ function BattleState:enter()
   self.enemySprites = {}
 
   self:addPlayerSprite( BattlePlayer( 4, 5, self ) )
+  self:addPlayerSprite( BattlePlayer( 3, 7, self ) )
+  self:addPlayerSprite( BattlePlayer( 3, 9, self ) )
+  self:addPlayerSprite( BattlePlayer( 4, 11, self ) )
   self:addEnemySprite( BattleEnemy( 8, 5, self ) )
 
   self.playerRoster = {}
@@ -24,16 +27,19 @@ function BattleState:enter()
 
   self.enemyRoster = {}
 
-  self.turn = "player"
   self.playerSwitch = 1
   self.mode = "move"
 
   self:addLayer(self.screen, self.world, Snitch())
 
+  self.switchSignal = Util.signal( self, self.handleSwitchMenu )
+
   self.stats = BattleStatsWindow( self.playerRoster, self.enemyRoster )
-  self.battleMainMenu = BattleMainMenu( 30, 24, self, Util.signal() )
+  self.battleMainMenu = BattleMainMenu( 30, 24, self )
   self:initMenuStack()
   self:pushMenu( self.stats )
+
+  self:advanceTurn()
 end
 
 function BattleState:addPlayerSprite(spr)
@@ -49,14 +55,10 @@ function BattleState:addEnemySprite(spr)
 end
 
 function BattleState:update(dt)
-  if Input.tap.escape then
-    StateMachine:pop()
+  if self.turn == "player" then
+    self:runPlayerTurn(dt)
   else
-    if self.turn == "player" then
-      self:runPlayerTurn(dt)
-    else
-      self:runEnemyTurn(dt)
-    end
+    self:runEnemyTurn(dt)
   end
 end
 
@@ -64,20 +66,17 @@ function BattleState:runPlayerTurn(dt)
   local who = self.playerSprites[self.playerSwitch]
   if not who.selected then
     who.selected = true
-    who:startTurn()
   end
   if self.mode == "move" then
-    if Input.tap.enter then
+    if Input.tap.escape then
+      StateMachine:pop()
+    elseif Input.tap.enter then
       self:setMode("menu")
     else
       who:runLogic(dt)
     end
   elseif self.mode == "menu" then
-    if Input.tap.enter then
-      self:advanceTurn()
-    else
-      self:updateMenu(dt)
-    end
+    self:updateMenu(dt)
   end
 end
 
@@ -85,7 +84,6 @@ function BattleState:runEnemyTurn(dt)
   local who = self.enemySprites[1]
   if not who.selected then
     who.selected = true
-    who:startTurn()
   end
   local done = who:runLogic(dt)
   if done then self:advanceTurn() end
@@ -93,11 +91,13 @@ end
 
 function BattleState:advanceTurn()
   if self.turn == "player" then
-    self:popAllMenus( self.stats )
     for _, spr in pairs(self.playerSprites) do
       spr.selected = false
     end
     self.turn = "enemy"
+    for _, spr in pairs(self.enemySprites) do
+      spr:startTurn()
+    end
   else
     for _, spr in pairs(self.enemySprites) do
       spr.selected = false
@@ -105,14 +105,33 @@ function BattleState:advanceTurn()
     self.turn = "player"
     self.playerSwitch = 1
     self:setMode("move")
+    for _, spr in pairs(self.playerSprites) do
+      spr:startTurn()
+    end
   end
 end
 
 function BattleState:setMode(m)
   self.mode = m
   if m == "menu" then
+    self.battleMainMenu:resetSelection()
     self:pushMenu( self.battleMainMenu )
+  elseif m == "end" then
+    self:popAllMenus( self.stats )
+    self:advanceTurn()
+  elseif m == "move" then
+    self:popAllMenus( self.stats )
   end
+end
+
+function BattleState:handleSwitchMenu( index )
+  local who = self.playerSprites[self.playerSwitch]
+  who.selected = false
+  index = ((index-1) % #self.playerSprites) + 1
+  who = self.playerSprites[index]
+  who.selected = true
+  self.playerSwitch = index
+  self:setMode("move")
 end
 
 ----------------------------------------
@@ -151,8 +170,29 @@ end
 ----------------------------------------
 
 BattleMainMenu = MenuListWidget:clone {
-  priority = 5, options = { "Action", "Move", "Switch", "End" }
+  priority = 1,
+  options = { "Action", "Move", "Switch", "End" },
+  handlers = {
+    function(self)
+    end;
+    function(self)
+      self.parent:setMode("move")
+    end;
+    function(self)
+      return MenuWhoWidget(30, 22, self, self.parent.switchSignal)
+    end;
+    function(self)
+      self.parent:setMode("end")
+    end;
+  }
 }
+
+function BattleMainMenu:selected( index )
+  local screen = self.handlers[index](self)
+  if screen then
+    self:pushMenu(screen)
+  end
+end
 
 ----------------------------------------
 
