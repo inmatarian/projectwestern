@@ -53,15 +53,13 @@ function Object:mixin(...)
       if not rawget(self, k) then rawset(self, k, v) end
     end
   end
+  return self
 end
-
-function Object:__unknown() end
 
 do
   local Test = Object:clone()
   Test.blah = 27
   function Test:lol() return self.blah end
-  function Test:__add(t2) print( self, "+", t2 ); return 0 end
   local Test2 = Test:clone()
   Test2.blah = 42
   local test = Test2()

@@ -11,8 +11,8 @@ function BattleState:enter()
   self.spriteWorld:setTileLayer( self.world )
 
   self.sprites = {
-    BattlePlayer( 4, 5 ),
-    BattleEnemy( 8, 5 )
+    BattlePlayer( 4, 5, self ),
+    BattleEnemy( 8, 5, self )
   }
 
   for _, spr in ipairs(self.sprites) do
@@ -20,40 +20,43 @@ function BattleState:enter()
   end
 
   self.turn = 1
-  self.sprites[1].selected = true
-
   self.roster = {}
   for _, ps in ipairs(Game.players) do
     self.roster[#self.roster+1] = ps:clone()
   end
 
-  self.stats = BattleStatsWindow( self.roster, 30, 0, 10, 30 )
+  self.stats = BattleStatsWindow( self.roster )
   self:addLayer(self.screen, self.world, self.stats, Snitch())
 end
 
-function BattleState:keypressed(key)
-  if key == "escape" then
-    StateMachine:pop()
-  end
-end
-
 function BattleState:update(dt)
-  local who = self.sprites[self.turn]
-  local done = who:runLogic(dt)
-  if done then self:advanceTurn() end
+  if Input.tap.escape then
+    StateMachine:pop()
+  else
+    local who = self.sprites[self.turn]
+    if not who.selected then
+      who.selected = true
+      who:startTurn()
+    end
+    local done = who:runLogic(dt)
+    if done then self:advanceTurn() end
+  end
 end
 
 function BattleState:advanceTurn()
   self.sprites[self.turn].selected = false
   self.turn = self.turn + 1
   if self.turn > #self.sprites then self.turn = 1 end
-  self.sprites[self.turn].selected = true
 end
 
-BattleStatsWindow = TextWindow:clone {}
+----------------------------------------
 
-function BattleStatsWindow:init(roster, ...)
-  BattleStatsWindow:superinit(self, ...)
+BattleStatsWindow = TextWindow:clone {
+  x = 30, y = 0, width = 10, height = 30
+}
+
+function BattleStatsWindow:init(roster)
+  BattleStatsWindow:superinit(self)
   self.roster = roster
   return self:refresh()
 end
@@ -63,10 +66,14 @@ function BattleStatsWindow:refresh()
       :fill(ASCII.Space)
       :frame('single')
       :horizLine('single', 0, 9, self.width)
+      :horizLine('single', 0, 24, self.width)
 
   for i, ps in ipairs(Game.players) do
     self:drawCharacter( 1 + ((i-1)*2), ps )
   end
+
+  self:drawMenu()
+
   return self
 end
 
@@ -74,22 +81,70 @@ function BattleStatsWindow:drawCharacter( y, ps )
   self:printf(1, y, ps.name)
       :setColor(Color.CYAN)
       :set(6, y, ASCII.Delete)
-      :printf(7, y, "%2i", ps.magicPoints )
+      :printf(7, y, "%2i", ps.actionPoints )
       :setColor(Color.WHITE)
       :set(1, y+1, ASCII.Heart, Color.RED)
       :printf(2, y+1, "%3i/%i", ps.hitPoints, ps.maxHP)
   return self
 end
 
+function BattleStatsWindow:drawMenu()
+  self:printf(2, 25, "Action")
+  self:printf(2, 26, "Move")
+  self:printf(2, 27, "Switch")
+  self:printf(2, 28, "End")
+  return self
+end
+
+----------------------------------------
+
+local dist, seek, lineup
+do
+  local abs = math.abs
+
+  function dist(x1, y1, x2, y2)
+    return abs(x2-x1) + abs(y2-y1)
+  end
+
+  function seek(sx, sy, tx, ty)
+    local dx, dy = tx - sx, ty - sy
+    local ax = ((( dx < 0 ) and -1) or (( dx > 0 ) and 1)) or 0
+    local ay = ((( dy < 0 ) and -1) or (( dy > 0 ) and 1)) or 0
+    if abs(dx) > abs(dy) then
+      return ax, 0
+    else
+      return 0, ay
+    end
+  end
+
+  function lineup(sx, sy, tx, ty)
+    local ax, ay = abs(tx-sx), abs(ty-sy)
+    if ax > ay then
+      return ( tx < sx ) and -1 or 1, 0
+    else
+      return 0, ( ty < sy ) and -1 or 1
+    end
+  end
+end
+
+----------------------------------------
+
 BattleSprite = Sprite:clone {
   selectedTile = 0,
   baseTile = 0,
-  selected = false
+  selected = false,
+  runLogic = NULLFUNC
 }
+
+function BattleSprite:init(x, y, parent)
+  self.parent = parent
+  BattleSprite:superinit(self, x, y)
+  return self
+end
 
 function BattleSprite:draw(x, y, dt)
   self.dt = (self.dt or 0) + dt
-  if self.selected and math.floor(self.dt*3) % 2 == 1 then
+  if self.selected and math.floor(self.dt*4) % 4 == 1 then
     self.tile = self.selectedTile
   else
     self.tile = self.baseTile
@@ -97,46 +152,76 @@ function BattleSprite:draw(x, y, dt)
   BattleSprite:super().draw(self, x, y, dt)
 end
 
+function BattleSprite:startTurn()
+  self.baseX, self.baseY = self.x, self.y
+end
+
+function BattleSprite:tryMove( dx, dy )
+  local newX, newY = self.x + dx, self.y + dy
+  if dist( newX, newY, self.baseX, self.baseY ) > 3 then return false end
+  self:move(dx, dy)
+  return (self.x == newX) and (self.y == newY)
+end
+
+----------------------------------------
+
 BattlePlayer = BattleSprite:clone {
   baseTile = 129
 }
 
+function BattlePlayer:startTurn()
+  BattlePlayer:super().startTurn(self)
+end
+
 function BattlePlayer:runLogic()
   if Input.tap.up then
-    self:move( 0, -1 )
-    return true
+    self:tryMove( 0, -1 )
   elseif Input.tap.down then
-    self:move( 0, 1 )
-    return true
+    self:tryMove( 0, 1 )
   elseif Input.tap.left then
-    self:move( -1, 0 )
-    return true
+    self:tryMove( -1, 0 )
   elseif Input.tap.right then
-    self:move( 1, 0 )
-    return true
-  elseif Input.tap.space then
+    self:tryMove( 1, 0 )
+  elseif Input.tap.enter then
     return true
   end
 end
 
-BattleEnemy = BattleSprite:clone {
-  baseTile = 130
+----------------------------------------
+
+BattleStrategy = {
+  Random = {
+    strategyStart = function(self)
+      self.targetX = self.x + Game.random(-3, 3)
+      self.targetY = self.y + Game.random(-3, 3)
+      self.moves = 3
+    end,
+    strategyLogic = function(self)
+      local dx, dy = seek(self.x, self.y, self.targetX, self.targetY)
+      self:tryMove( dx, dy )
+      self.moves = self.moves - 1
+      return (self.moves <= 0)
+    end
+  };
 }
 
+----------------------------------------
+
+BattleEnemy = BattleSprite:clone {
+  baseTile = 130,
+}
+BattleEnemy:mixin(BattleStrategy.Random)
+
+function BattleEnemy:startTurn()
+  BattleEnemy:super().startTurn(self)
+  self.waitTimer = Game.random(3,15) / 8
+  return self:strategyStart()
+end
+
 function BattleEnemy:runLogic(dt)
-  self.waitTimer = (self.waitTimer or math.random(2,5)/4) - dt
+  self.waitTimer = self.waitTimer - dt
   if self.waitTimer > 0 then return false end
-  self.waitTimer = nil
-  local dir = math.random(1, 5)
-  if dir == 1 then
-    self:move( 0, -1 )
-  elseif dir == 2 then
-    self:move( 0, 1 )
-  elseif dir == 3 then
-    self:move( -1, 0 )
-  elseif dir == 4 then
-    self:move( 1, 0 )
-  end
-  return true
+  self.waitTimer = Game.random(2, 4) / 8
+  return self:strategyLogic()
 end
 

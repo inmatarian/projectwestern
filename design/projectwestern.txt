@@ -1,0 +1,75 @@
+
+PROJECT WESTERN
+
+Genre: Old Scool RPG
+
+Characters:
+ - Hugo: 
+ - Evan: 
+ - Anna: 
+ - Sara: 
+
+Story Points:
+ - Hugo, Evan, and Anna rescue Sara from kidnapper
+ - King of has started war on Western border
+ - Participate in Battle
+ - Travel into Midland
+ - Something benign
+ - Learn about King's evil plan
+ - Travel North to Abysm
+ - Defeat the Goliaths
+ - Travel North to the World Bridge
+ - Cross World Bridge into Arcadia
+ - Enter Pantheon
+ - Defeat the Titans
+
+Character Definitions:
+  - Hit points
+  - Max Hit points
+  - Action points
+  - Max Action points
+
+  - Talents:
+    - Equipment based talents:
+      - Swordplay: Able to equip swords
+      - Swordmanship: Increased damage from swords
+      - Knighthood: Greatly increased damage from swords
+      - Knifeplay: Able to equip daggers
+      - Dexterity: Increased damage from daggers
+      - Butchery: Greatly increased damage from daggers
+      - Archery: Able to equip bows
+      - EagleEye: Better accuracy with bows
+      - Sharpshooter: Greatly improved accuracy with bows
+      - Cleaver: Able to equip axes
+      - Savage: Increased damage from axes
+      - Barbaric: Greatly increased damage from axes
+      - Outfitter: Able to equip armors
+      - Defense: Increased effect from armors
+      - Faith: Able to equip magic items
+    - Magick based talents:
+      - Wizardry: Able to use black magicks
+      - Witchcraft: Increased effect from black magicks
+      - Sorcery: Greatly increased effect from black magicks
+      - Healing: Able to use healing magicks
+      - Therapy: Increased effect from healing magicks
+      - Doctorate: Greatly increased effect from healing magicks
+      - Juju: Able to use buff magics
+      - Voodoo: Increased effect from buff magicks
+      - Shamanism: Greatly increased effect from buff magicks
+      - Alchemy: Able to mix potions
+    - Statistic based talents:
+      - Stamina: Increase in Max Action Points
+      - Agility: Faster Action Point recovery
+      - Fortitude: Increase in Max Hit Points
+    - Passive ability talents:
+      - Vigor: Decreased damage from poison
+      - Immunity: Reduced chance of being poisoned
+      - Feint: Increased chance of dodging attacks
+      - Absorb: Reduced damage from magic attacks
+      - Velocity: Increase maximum movement range
+      - Sprint: Decreased Action Point cost for movement
+      - Awareness: Increased chance of combat initiative
+
+
+
+

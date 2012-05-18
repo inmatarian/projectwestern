@@ -59,10 +59,8 @@ PlayerStats = Object:clone {
     "name",
     "hitPoints",
     "maxHP",
-    "magicPoints",
-    "vigor",
-    "acuity",
-    "speed",
+    "actionPoints",
+    "maxAP",
     "techLevel",
     "techPoints",
     "experience"
@@ -95,17 +93,16 @@ end
 --------------------------------------------------------------------------------
 
 Game = {
+  random = math.random,
   deltaTime = 0,
   focused = true,
   inventory = Inventory(),
   HugoDatum = {
     name = "Hugo",
-    hitPoints = 0,
+    hitPoints = 30,
     maxHP = 30,
-    magicPoints = 0,
-    vigor = 10,
-    acuity = 10,
-    speed = 10,
+    actionPoints = 10,
+    maxAP = 10,
     techLevel = 1,
     techPoints = 1,
     experience = 0

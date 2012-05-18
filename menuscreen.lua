@@ -40,6 +40,11 @@ function MenuScreenState:popMenu()
   return self
 end
 
+function MenuScreenState:refresh()
+  self.playerStats:refresh()
+  self.moneyWin:refresh()
+end
+
 ----------------------------------------
 
 MenuScreenWindow = TextWindow:clone {
@@ -63,6 +68,11 @@ function MenuScreenWindow:popMenu()
   return self
 end
 
+function MenuScreenWindow:refreshAll()
+  self.parent:refresh()
+  self:refresh()
+end
+
 ----------------------------------------
 
 PartyShortStatsWindow = MenuScreenWindow:clone {
@@ -73,7 +83,7 @@ function PartyShortStatsWindow:drawCharacter( y, ps )
   self:printf(1, y, ps.name)
       :setColor(Color.CYAN)
       :set(6, y, ASCII.Delete)
-      :printf(7, y, "%2i", ps.magicPoints )
+      :printf(7, y, "%2i", ps.actionPoints )
       :setColor(Color.WHITE)
       :set(1, y+1, ASCII.Heart, Color.RED)
       :printf(2, y+1, "%3i/%i", ps.hitPoints, ps.maxHP)
@@ -107,9 +117,11 @@ end
 ----------------------------------------
 
 SelectionMixin = {
-  initSelection = function(self, max, columns)
+  initSelection = function(self, max, columns, rows)
     self.selectionOption = 1
+    self.selectionFirst = 1
     self.selectionColumns = columns or 1
+    self.selectionRows = rows or max
     self.selectionMax = max
     return self
   end,
@@ -120,8 +132,8 @@ SelectionMixin = {
     elseif Input.tap.down then dist = col
     elseif Input.tap.left then dist = -1
     elseif Input.tap.right then dist = 1
-    elseif Input.tap.pageup then dist = -8 * col
-    elseif Input.tap.pagedown then dist = 8 * col
+    elseif Input.tap.pageup then dist = -(self.selectionRows-1) * col
+    elseif Input.tap.pagedown then dist = (self.selectionRows-1) * col
     elseif Input.tap.home then dist = -9001
     elseif Input.tap["end"] then dist = 9001
     elseif Input.tap.enter then
@@ -129,6 +141,11 @@ SelectionMixin = {
     end
     if dist ~= 0 then
       self.selectionOption = bound(1, self.selectionOption+dist, self.selectionMax)
+      if self.selectionOption > (self.selectionFirst+self.selectionRows-1) then
+        self.selectionFirst = self.selectionOption - self.selectionRows+1
+      elseif self.selectionOption < self.selectionFirst then
+        self.selectionFirst = self.selectionOption
+      end
       self:refresh()
     end
     return self
@@ -182,8 +199,15 @@ function MenuScreenMenuList:refresh()
     self:setColor(Color.WHITE, back):printf(2, startLine + i, opt)
   end
 
-  self:setColor(Color.WHITE, Color.BLACK)
-      :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
+  if self.firstPick then
+    self:setColor(Color.WHITE, Color.BLACK)
+        :set(1, startLine + self.firstPick, ASCII.Right_fat_arrow)
+        :setColor(Color.YELLOW, Color.BLACK)
+        :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
+  else
+    self:setColor(Color.WHITE, Color.BLACK)
+        :set(1, startLine + self.selectionOption, ASCII.Right_fat_arrow)
+  end
 
   return self
 end
@@ -207,7 +231,7 @@ MenuScreenMainMenu = MenuScreenMenuList:clone {
     function(self, x, y) return end;
     function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.equipWho) end;
     function(self, x, y) return MenuScreenWhoMenu(x+2, y+2, self, self.signals.learnWho) end;
-    function(self, x, y) return end;
+    function(self, x, y) return MenuScreenOrderMenu(x+4, y+4, self) end;
     function(self, x, y) return MenuScreenSystemMenu( 4, 3, self ) end;
   }
 }
@@ -247,11 +271,8 @@ MenuScreenSystemMenu = MenuScreenMenuList:clone {
   options = { "Save", "Reset", "Quit", "Back" },
 }
 
-function MenuScreenSystemMenu:init(x, y, parent)
-  return MenuScreenSystemMenu:superinit(self, x, y, parent, Util.signal(self, self.handle))
-end
-
-function MenuScreenSystemMenu:handle( index, option )
+function MenuScreenSystemMenu:selected( index )
+  local option = self.options[index]
   if option == "Quit" then
     Game:quit()
   elseif option == "Reset" then
@@ -278,6 +299,24 @@ end
 
 ----------------------------------------
 
+MenuScreenOrderMenu = MenuScreenWhoMenu:clone {
+  title = "Order"
+}
+
+function MenuScreenOrderMenu:selected(index)
+  if self.firstPick then
+    local gp = Game.players
+    gp[self.firstPick], gp[index] = gp[index], gp[self.firstPick]
+    self.firstPick = nil
+    self:refreshAll()
+  else
+    self.firstPick = index
+    self:refresh()
+  end
+end
+
+----------------------------------------
+
 CharacterStatusWindow = MenuScreenWindow:clone {
   width = 34, height = 24, priority = 10,
 }
@@ -296,22 +335,17 @@ function CharacterStatusWindow:refresh()
       :vertLine('single', 7, 0, 3)
       :printf(2, 1, ps.name )
 
-      :printf(2, 3, "HP: %3i/%3i", ps.hitPoints, ps.maxHP)
-      :printf(2, 4, "Morale:  50")
+      :printf(2, 3, "Hit Points:     %3i/%-3i", ps.hitPoints, ps.maxHP)
+      :printf(2, 4, "Action Points:   %2i/%-2i", ps.actionPoints, ps.maxAP)
+      :printf(2, 5, "Armor Class: 5")
 
---[[
-      :printf(1, 1, "NAME" )
-      :printf(2, 2, "HP: 999/999")
-      :printf(2, 3, "Morale:  50")
-      :printf(16, 1, "Vigor:  99")
-      :printf(16, 2, "Acuity: 99")
-      :printf(16, 3, "Speed:  99")
-      :printf(2,  5, "Weapon: KickAssSwordYeah")
-      :printf(2,  6, "Helmet: DontBashMyHeadIn")
-      :printf(2,  7, "Armor:  ViolentChestBump")
-      :printf(2,  8, "Extra:  RingOfFuckYouUp")
-      :printf(2,  10, "Prepared Abilities:")
-      :printf(3,  11, "ABCDEFGHIJKLMNOP")
+      :printf(2,  6, "Helmet:    DontBashMyHeadIn")
+      :printf(2,  7, "Armor:     ViolentChestBump")
+      :printf(2,  8, "Shield:    OhGodDontHitMe")
+      :printf(2,  9, "Accessory: RingOfFuckYouUp")
+
+      :printf(2,  10, "Items:")
+      :printf(2,  11, "KickAssSwordYeah")
       :printf(3,  12, "ABCDEFGHIJKLMNOP")
       :printf(3,  13, "ABCDEFGHIJKLMNOP")
       :printf(3,  14, "ABCDEFGHIJKLMNOP")
@@ -320,7 +354,6 @@ function CharacterStatusWindow:refresh()
       :printf(3,  17, "ABCDEFGHIJKLMNOP")
       :printf(3,  18, "ABCDEFGHIJKLMNOP")
 
-]]
   return self
 end
 
@@ -336,16 +369,19 @@ CharacterLearnWindow = MenuScreenWindow:clone {
   width = 30, height = 20, priority = 10,
 
   classNames = {
-    "Squire",
-    "Knight",
-    "Alchemist",
+    "Swordplay", "Swordmanship", "Knighthood", "Knifeplay", "Dexterity",
+    "Butchery", "Archery", "EagleEye", "Sharpshooter", "Cleaver", "Savage",
+    "Barbaric", "Outfitter", "Defense", "Faith", "Wizardry", "Witchcraft",
+    "Sorcery", "Healing", "Therapy", "Doctorate", "Juju", "Voodoo", "Shamanism",
+    "Alchemy", "Stamina", "Agility", "Fortitude", "Vigor", "Immunity", "Feint",
+    "Absorb", "Velocity", "Sprint", "Awareness",
   }
 }
 
 CharacterLearnWindow:mixin( SelectionMixin )
 
 function CharacterLearnWindow:init( ps, parent )
-  self:initSelection( #self.classNames )
+  self:initSelection( #self.classNames, 1, 12 )
   self.playerStats = ps
   CharacterLearnWindow:superinit(self, "center", "center", parent)
   return self
@@ -364,16 +400,19 @@ function CharacterLearnWindow:refresh()
       :printf(16, self.height-2, "Next: 999999")
       :vertLine('single', 14, self.height-3, 3)
 
-  for i, s in ipairs(self.classNames) do
-    self:printf(3, 3+i, s)
+  local y = 4
+  for i = self.selectionFirst, self.selectionFirst + self.selectionRows - 1 do
+    local s = self.classNames[i]
+    self:printf(3, y, s)
     local val = self.playerStats.knowledge[i] or 0
     for j = 1, val do
-      self:set( 19+j, 3+i, ASCII.Black_square )
+      self:set( 19+j, y, ASCII.Black_square )
     end
+    y = y + 1
   end
 
   self:setColor(Color.WHITE, Color.BLACK)
-      :set(2, 3+self.selectionOption, ASCII.Right_fat_arrow)
+      :set(2, 4+self.selectionOption-self.selectionFirst, ASCII.Right_fat_arrow)
   return self
 end
 
