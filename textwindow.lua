@@ -325,6 +325,7 @@ end
 
 MenuListWidget = WindowWidget:clone {
   priority = 2,
+  minWidth = 3, minHeight = 3,
   options = { "Return" }
 }
 
@@ -339,7 +340,7 @@ end
 
 function MenuListWidget:recalculateSize()
   self.height = 2 + #self.options
-  self.width = 0
+  self.width = self.minWidth
   for _, opt in ipairs(self.options) do
     self.width = math.max( self.width, 3 + #opt )
   end
@@ -347,6 +348,8 @@ function MenuListWidget:recalculateSize()
     self.height = self.height + 2
     self.width = math.max( self.width, 2 + #self.title )
   end
+  self.width = math.max( self.width, self.minWidth )
+  self.height = math.max( self.height, self.minHeight )
   return self
 end
 

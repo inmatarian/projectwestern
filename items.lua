@@ -3,31 +3,70 @@ Item = Object:clone {
   lookup = {},
   name = "",
   desc = "",
-  quantity = 0
+  quantity = 0,
+  useDist = 1
 }
 
-function Item:init( id, name, desc )
-  self.id = id
-  self.name = name
-  self.desc = desc
-  self.lookup[id] = self
-  if name then self.lookup[name] = self end
+function Item:init()
+  self.lookup[self.id] = self
+  if self.name then self.lookup[self.name] = self end
 end
 
-local NULLITEM = Item( 0 )
+local NULLITEM = Item:initialize { id = 0 }
 
 function Item:getItem( identifier )
   return self.lookup[ identifier ] or NULLITEM
 end
 
-Item( 1, "Aloe",      "Recover some Hit Points." )
-Item( 2, "Cohosh",    "Recover most Hit Points." )
-Item( 3, "Valerian",  "Raises Morale." )
-Item( 4, "Rosemary",  "Remove Shock." )
-Item( 5, "Thistle",   "Remove Poison." )
-Item( 6, "Echinacea", "Heals all conditions." )
-Item( 7, "Hartshorn", "Wake the Fallen." )
-Item( 8, "Manchineel", "Inflict Poison")
+--------------------------------------------------------------------------------
+
+Item:initialize {
+  id = 1,
+  name = "Aloe",
+  desc = "Recover some Hit Points."
+}
+
+Item:initialize {
+  id = 2,
+  name = "Cohosh",
+  desc = "Recover most Hit Points."
+}
+
+Item:initialize {
+  id = 3,
+  name = "Valerian",
+  desc = "Raises Morale."
+}
+
+Item:initialize {
+  id = 4,
+  name = "Rosemary",
+  desc = "Remove Shock."
+}
+
+Item:initialize {
+  id = 5,
+  name = "Thistle",
+  desc = "Remove Poison."
+}
+
+Item:initialize {
+  id = 6,
+  name = "Echinacea",
+  desc = "Heals all conditions."
+}
+
+Item:initialize {
+  id = 7,
+  name = "Hartshorn",
+  desc = "Wake the Fallen."
+}
+
+Item:initialize {
+  id = 8,
+  name = "Manchineel",
+  desc = "Inflict Poison"
+}
 
 --------------------------------------------------------------------------------
 

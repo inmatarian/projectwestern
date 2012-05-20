@@ -57,6 +57,7 @@ SpriteWorld = Object:clone {}
 function SpriteWorld:init()
   self.sprites = {}
   self.spatialHash = {}
+  self.transients = {}
   self.logicQueue = {}
   return self
 end
@@ -84,6 +85,18 @@ end
 
 function SpriteWorld:getSpriteAt( x, y )
   return self.spatialHash[ y * 1000 + x ]
+end
+
+function SpriteWorld:getVisibleAt( x, y )
+  local best = self:getSpriteAt( x, y )
+  for _, spr in ipairs( self.transients ) do
+    if x==floor(spr.x) and y==floor(spr.y) then
+      if not best or best.priority <= spr.priority then
+        best = spr
+      end
+    end
+  end
+  return best
 end
 
 function SpriteWorld:moveSprite( spr, dx, dy )
@@ -115,3 +128,20 @@ function SpriteWorld:removeSprite( spr )
   return self
 end
 
+function SpriteWorld:addTransient( spr )
+  for _, v in ipairs(self.transients) do
+    if v == spr then return self end
+  end
+  table.insert( self.transients, spr )
+  return self
+end
+
+function SpriteWorld:removeTransient( spr )
+  for i, v in ipairs(self.transients) do
+    if v == spr then
+      table.remove( self.transients, i )
+      break
+    end
+  end
+  return self
+end

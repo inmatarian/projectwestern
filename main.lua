@@ -26,12 +26,12 @@ E = Util.symbol()
 --------------------------------------------------------------------------------
 
 Snitch = ScrollingWindow:clone {
-  dt = 1, visible = false
+  dt = 1, visible = false, defaultChar = 0
 }
 
 function Snitch:init()
   Snitch:superinit(self, 0, 0, 40, 1, 2993)
-  return self:writeln("-")
+  return self:writeln("")
 end
 
 function Snitch:toggle()

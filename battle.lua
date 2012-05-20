@@ -13,6 +13,7 @@ function BattleState:enter()
 
   self.playerSprites = {}
   self.enemySprites = {}
+  self.itemCursor = ItemUseCursor( 0, 0 )
 
   self:addPlayerSprite( BattlePlayer( 4, 5, self ) )
   self:addPlayerSprite( BattlePlayer( 3, 7, self ) )
@@ -30,15 +31,16 @@ function BattleState:enter()
   self.playerSwitch = 1
   self.mode = "move"
 
-  self:addLayer(self.screen, self.world, Snitch())
-
-  self.switchSignal = Util.signal( self, self.handleSwitchMenu )
-
   self.stats = BattleStatsWindow( self.playerRoster, self.enemyRoster )
-  self.battleMainMenu = BattleMainMenu( 30, 24, self )
-  self:initMenuStack()
-  self:pushMenu( self.stats )
+  self:addLayer(self.screen, self.world, self.stats, Snitch())
 
+  self.signals = {
+    switch = Util.signal( self, self.handleSwitchMenu );
+    item = Util.signal( self, self.handleItemMenu );
+  }
+
+  self.battleMainMenu = BattleMainMenu( self )
+  self:initMenuStack()
   self:advanceTurn()
 end
 
@@ -60,6 +62,9 @@ function BattleState:update(dt)
   else
     self:runEnemyTurn(dt)
   end
+  if Input.tap.f7 then
+    StateMachine:pop()
+  end
 end
 
 function BattleState:runPlayerTurn(dt)
@@ -68,15 +73,26 @@ function BattleState:runPlayerTurn(dt)
     who.selected = true
   end
   if self.mode == "move" then
-    if Input.tap.escape then
-      StateMachine:pop()
-    elseif Input.tap.enter then
+    if Input.tap.enter then
       self:setMode("menu")
     else
-      who:runLogic(dt)
+      who:runLogic()
     end
   elseif self.mode == "menu" then
-    self:updateMenu(dt)
+    if Input.tap.escape then
+      self:popMenu()
+      if self:menuStackEmpty() then
+        self:setMode("move")
+      end
+    else
+      self:updateMenu(dt)
+    end
+  elseif self.mode == "item" then
+    if Input.tap.escape then
+      self:setMode("menu")
+    else
+      self.itemCursor:runLogic()
+    end
   end
 end
 
@@ -112,15 +128,23 @@ function BattleState:advanceTurn()
 end
 
 function BattleState:setMode(m)
+  local oldm = self.mode
   self.mode = m
   if m == "menu" then
-    self.battleMainMenu:resetSelection()
-    self:pushMenu( self.battleMainMenu )
+    if oldm == "item" then
+      self.world.priority = 1
+      self.spriteWorld:removeTransient( self.itemCursor )
+    else
+      self.battleMainMenu:resetSelection()
+      self:pushMenu( self.battleMainMenu )
+    end
   elseif m == "end" then
-    self:popAllMenus( self.stats )
+    self:popAllMenus()
     self:advanceTurn()
   elseif m == "move" then
-    self:popAllMenus( self.stats )
+    self:popAllMenus()
+  elseif m == "item" then
+    self.world.priority = 100
   end
 end
 
@@ -132,6 +156,13 @@ function BattleState:handleSwitchMenu( index )
   who.selected = true
   self.playerSwitch = index
   self:setMode("move")
+end
+
+function BattleState:handleItemMenu( index )
+  local who = self.playerSprites[self.playerSwitch]
+  self.itemCursor:prepare( who.x, who.y, 2 )
+  self.spriteWorld:addTransient( self.itemCursor )
+  self:setMode("item")
 end
 
 ----------------------------------------
@@ -170,16 +201,17 @@ end
 ----------------------------------------
 
 BattleMainMenu = MenuListWidget:clone {
-  priority = 1,
+  priority = 1, x = 30, y = 24,
   options = { "Action", "Move", "Switch", "End" },
   handlers = {
     function(self)
+      return BattleItemMenu(self, self.parent.signals.item)
     end;
     function(self)
       self.parent:setMode("move")
     end;
     function(self)
-      return MenuWhoWidget(30, 22, self, self.parent.switchSignal)
+      return MenuWhoWidget(30, 22, self, self.parent.signals.switch)
     end;
     function(self)
       self.parent:setMode("end")
@@ -187,11 +219,27 @@ BattleMainMenu = MenuListWidget:clone {
   }
 }
 
+function BattleMainMenu:init( parent )
+  return BattleMainMenu:superinit(self, self.x, self.y, parent)
+end
+
 function BattleMainMenu:selected( index )
   local screen = self.handlers[index](self)
   if screen then
     self:pushMenu(screen)
   end
+end
+
+----------------------------------------
+
+BattleItemMenu = MenuListWidget:clone {
+  priority = 2, x = -19, y = -10,
+  minWidth = 19, minHeight = 10,
+  options = { " ", " ", " ", " ", " ", " ", " ", " " }
+}
+
+function BattleItemMenu:init( parent, signal, ps )
+  return BattleItemMenu:superinit(self, self.x, self.y, parent, signal)
 end
 
 ----------------------------------------
@@ -231,6 +279,7 @@ BattleSprite = Sprite:clone {
   selectedTile = 0,
   baseTile = 0,
   selected = false,
+  dist = 3,
   runLogic = NULLFUNC
 }
 
@@ -256,31 +305,35 @@ end
 
 function BattleSprite:tryMove( dx, dy )
   local newX, newY = self.x + dx, self.y + dy
-  if dist( newX, newY, self.baseX, self.baseY ) > 3 then return false end
+  if dist( newX, newY, self.baseX, self.baseY ) > self.dist then return false end
   self:move(dx, dy)
   return (self.x == newX) and (self.y == newY)
 end
 
 ----------------------------------------
 
+PlayerControlMixin = {
+  runLogic = function(self)
+    if Input.tap.up then
+      self:tryMove( 0, -1 )
+    elseif Input.tap.down then
+      self:tryMove( 0, 1 )
+    elseif Input.tap.left then
+      self:tryMove( -1, 0 )
+    elseif Input.tap.right then
+      self:tryMove( 1, 0 )
+    end
+  end
+}
+
+----------------------------------------
+
 BattlePlayer = BattleSprite:clone {
   baseTile = 129
-}
+}:mixin(PlayerControlMixin)
 
 function BattlePlayer:startTurn()
   BattlePlayer:super().startTurn(self)
-end
-
-function BattlePlayer:runLogic()
-  if Input.tap.up then
-    self:tryMove( 0, -1 )
-  elseif Input.tap.down then
-    self:tryMove( 0, 1 )
-  elseif Input.tap.left then
-    self:tryMove( -1, 0 )
-  elseif Input.tap.right then
-    self:tryMove( 1, 0 )
-  end
 end
 
 ----------------------------------------
@@ -319,5 +372,29 @@ function BattleEnemy:runLogic(dt)
   if self.waitTimer > 0 then return false end
   self.waitTimer = Game.random(2, 4) / 8
   return self:strategyLogic()
+end
+
+----------------------------------------
+
+ItemUseCursor = BattleSprite:clone {
+  baseTile = 10,
+  priority = 1,
+  selected = true
+}:mixin(PlayerControlMixin)
+
+function ItemUseCursor:init( x, y, signal )
+  self.signal = signal
+  return ItemUseCursor:superinit(self, x, y)
+end
+
+function ItemUseCursor:prepare( x, y, dist )
+  self.x, self.baseX = x, x
+  self.y, self.baseY = y, y
+  self.dist = dist
+end
+
+function ItemUseCursor:move( dx, dy )
+  self.x = self.x + dx
+  self.y = self.y + dy
 end
 

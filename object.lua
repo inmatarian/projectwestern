@@ -1,34 +1,26 @@
 
-local MT = {}
-
-function MT.__call(parent, ...)
-  return parent:new(...)
-end
-
-function MT.__index(obj, key)
-  local parent = rawget(obj, "__prototype")
-  if parent then return parent[key] end
-end
-
 Object = {}
-setmetatable( Object, MT )
+
+function Object:clone(body)
+  return setmetatable(rawset(body or {}, "__prototype", self), Object)
+end
 
 function Object:init() return self end
 
-function Object:new(...)
-  local instance = self:clone()
-  return instance:init(...) or instance
+function Object:initialize( body, ... )
+  return self:clone(body):init(...) or body
 end
 
-function Object:clone(body)
-  body = body or {}
-  rawset(body, "__prototype", self)
-  return setmetatable(body, MT)
+function Object:__call(...)
+  return self:initialize( {}, ...)
+end
+
+function Object:__index(key)
+  return rawget(self, "__prototype")[key]
 end
 
 function Object:become(obj)
-  rawset(self, "__prototype", obj)
-  return self
+  return rawset(self, "__prototype", obj)
 end
 
 function Object:super()
@@ -36,39 +28,32 @@ function Object:super()
 end
 
 function Object:superinit(obj, ...)
-  return self:super().init(obj, ...)
+  return rawget(self, "__prototype").init(obj, ...)
 end
 
 function Object:isA(ancestor)
   repeat
     if self == ancestor then return true end
-    self = self:super()
+    self = rawget(self, "__prototype")
   until not self
-  return self == ancestor
 end
 
 function Object:mixin(...)
   for i = 1, select('#', ...) do
     for k, v in pairs(select(i, ...)) do
-      if not rawget(self, k) then rawset(self, k, v) end
+      rawset(self, k, v)
     end
   end
   return self
 end
 
-do
-  local Test = Object:clone()
-  Test.blah = 27
-  function Test:lol() return self.blah end
-  local Test2 = Test:clone()
-  Test2.blah = 42
-  local test = Test2()
-  assert( not test.value )
-  assert( test.blah == 42 )
-  assert( test:lol() == 42 )
-  Test2.blah = 2993
-  assert( test:lol() == 2993 )
-  assert( test:isA(Test2) and test:isA(Test) )
-  assert( not Test:isA(Test2) )
+local function unittest()
+  local TestFoo = Object:clone()
+  local Waka = { wakawaka = function(self) return 27 end }
+  local TestBar = TestFoo:clone():mixin(Waka)
+  local testbaz = TestBar()
+  assert( not testbaz.undeclared )
+  assert( testbaz:wakawaka() == 27 )
+  assert( testbaz:isA(TestFoo) and testbaz:isA(Object) )
 end
 

@@ -1,6 +1,6 @@
 
 TileLayer = Object:clone {
-  priority = 0
+  priority = 1
 }
 
 function TileLayer:init(x, y, w, h, vw, vh, pri, data)
@@ -25,7 +25,7 @@ function TileLayer.loadMap( filename, x, y, viewWidth, viewHeight )
       break
     end
   end
-  return TileLayer( x, y, w, h, viewWidth, viewHeight, 50, data )
+  return TileLayer( x, y, w, h, viewWidth, viewHeight, nil, data )
 end
 
 function TileLayer:setCenter(x, y)
@@ -92,6 +92,17 @@ function TileLayer:getSpriteAt(x, y)
   end
 end
 
+function TileLayer:getVisibleAt( x, y )
+  local visi
+  if self.spriteWorld then
+    visi = self.spriteWorld:getVisibleAt(x, y)
+  end
+  if not visi then
+    visi = self:getTile(x, y)
+  end
+  return visi
+end
+
 function TileLayer:getDrawingParameters()
   local vw, vh = self.viewWidth, self.viewHeight
   local cx, cy = self.centerX, self.centerY
@@ -118,11 +129,8 @@ function TileLayer:draw(dt)
     for x = left, right do
       local visi = tonumber(self:getVisi(x, y))
       if visi and (visi > 0) then
-        local drawable = self:getSpriteAt(x, y)
-        if not drawable then
-          drawable = self:getTile(x, y)
-        end
         local xx, yy = self:screenPositionTile( x, y )
+        local drawable = self:getVisibleAt(x, y)
         drawable:draw(xx, yy, dt)
       end
     end
